@@ -3,6 +3,7 @@ const cors = require('cors');
 const { connectDatabase, disconnectDatabase } = require('./config/database');
 const authRoutes = require('./routes/authRoutes');
 const workoutRoutes = require('./routes/workoutRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 
 const app = express();
 
@@ -12,6 +13,7 @@ app.use(express.json());
 // Rotas
 app.use('/api/auth', authRoutes);
 app.use('/api/workouts', workoutRoutes);
+app.use('/api/admin', adminRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ 
