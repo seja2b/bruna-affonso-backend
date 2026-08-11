@@ -1,0 +1,14 @@
+{
+  "name": "bruna-affonso-api",
+  "version": "1.0.0",
+  "description": "API para Plataforma de Treinos",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node src/server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5"
+  }
+}
