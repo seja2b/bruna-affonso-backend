@@ -62,4 +62,19 @@ async function updateWorkout(req, res) {
 async function deleteWorkout(req, res) {
   try {
     const userId = req.userId;
-    const user = await
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    
+    if (user?.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Apenas admin pode deletar treinos' });
+    }
+
+    const { id } = req.params;
+    await prisma.workout.delete({ where: { id } });
+
+    return res.json({ message: 'Treino deletado com sucesso' });
+  } catch (error) {
+    return res.status(500).json({ error: 'Erro ao deletar treino' });
+  }
+}
+
+module.exports = { getWorkouts, createWorkout, updateWorkout, deleteWorkout };
