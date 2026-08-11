@@ -1,8 +1,8 @@
-import { PrismaClient } from '@prisma/client';
+const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 
-export async function connectDatabase() {
+async function connectDatabase() {
   try {
     await prisma.$queryRaw`SELECT 1`;
     console.log('✅ Banco de dados conectado!');
@@ -12,8 +12,8 @@ export async function connectDatabase() {
   }
 }
 
-export async function disconnectDatabase() {
+async function disconnectDatabase() {
   await prisma.$disconnect();
 }
 
-export { prisma };
+module.exports = { prisma, connectDatabase, disconnectDatabase };
