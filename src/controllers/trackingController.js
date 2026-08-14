@@ -2,14 +2,28 @@ import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
-// GET todas as semanas do aluno (com liberação automática)
+// GET todas as semanas do aluno
 export const getStudentWeeks = async (req, res) => {
   try {
     const { studentId } = req.params
 
+    // Se receber userId em vez de studentId, busca o studentId
+    let actualStudentId = studentId
+    
+    if (studentId && studentId.length > 20) {
+      // Parece ser um userId, busca o studentId
+      const student = await prisma.student.findUnique({
+        where: { userId: studentId }
+      })
+      if (!student) {
+        return res.status(404).json({ error: 'Aluno não encontrado' })
+      }
+      actualStudentId = student.id
+    }
+
     // Pega todas as semanas do aluno
     let weeks = await prisma.weeklyTracking.findMany({
-      where: { studentId },
+      where: { studentId: actualStudentId },
       include: {
         exercises: true,
         observation: true
@@ -20,29 +34,28 @@ export const getStudentWeeks = async (req, res) => {
     // Se não houver semanas, cria a primeira
     if (weeks.length === 0) {
       const startDate = new Date()
-      startDate.setDate(startDate.getDate() - startDate.getDay() + 1) // Começa na segunda
+      startDate.setDate(startDate.getDate() - startDate.getDay() + 1)
       const endDate = new Date(startDate)
       endDate.setDate(endDate.getDate() + 6)
 
       const week1 = await prisma.weeklyTracking.create({
         data: {
-          studentId,
+          studentId: actualStudentId,
           weekNumber: 1,
           startDate,
           endDate,
-          isReleased: true // Semana 1 sempre liberada
+          isReleased: true
         },
         include: { exercises: true, observation: true }
       })
       weeks = [week1]
     }
 
-    // Valida liberação automática (toda segunda-feira, libera a próxima semana)
+    // Valida liberação automática
     for (let i = 1; i < weeks.length; i++) {
       const previousWeek = weeks[i - 1]
       const currentWeek = weeks[i]
 
-      // Se semana anterior foi completada há 7 dias, libera a próxima
       if (previousWeek.isCompleted && previousWeek.completedAt) {
         const sevenDaysLater = new Date(previousWeek.completedAt)
         sevenDaysLater.setDate(sevenDaysLater.getDate() + 7)
@@ -275,7 +288,7 @@ export const updateProfilePhoto = async (req, res) => {
     const { studentId } = req.params
     const { profilePhoto } = req.body
 
-    // Atualiza foto no User (não em Student)
+    // Busca o student
     const student = await prisma.student.findUnique({
       where: { id: studentId },
       select: { userId: true }
@@ -285,6 +298,7 @@ export const updateProfilePhoto = async (req, res) => {
       return res.status(404).json({ error: 'Aluno não encontrado' })
     }
 
+    // Atualiza foto no User
     const user = await prisma.user.update({
       where: { id: student.userId },
       data: { profilePhoto }
@@ -298,7 +312,6 @@ export const updateProfilePhoto = async (req, res) => {
 }
 
 // ===== FUNÇÃO AUXILIAR =====
-// Valida se a semana está completa e concede pontos
 const checkWeekCompletion = async (weeklyTrackingId) => {
   try {
     const week = await prisma.weeklyTracking.findUnique({
