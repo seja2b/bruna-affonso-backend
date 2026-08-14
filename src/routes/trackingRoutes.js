@@ -1,4 +1,5 @@
 import express from 'express'
+import { authMiddleware, adminOnly, studentOnly } from '../middleware/authMiddleware.js'
 import {
   getStudentWeeks,
   saveTrackingExercise,
@@ -11,17 +12,17 @@ import {
 
 const router = express.Router()
 
-// ROTAS DO ALUNO
-router.get('/student/:studentId/weeks', getStudentWeeks)
-router.post('/exercise/save', saveTrackingExercise)
-router.put('/note/student', saveStudentNote)
-router.put('/profile-photo/:studentId', updateProfilePhoto)
+// ROTAS DO ALUNO (protegidas)
+router.get('/student/:studentId/weeks', authMiddleware, studentOnly, getStudentWeeks)
+router.post('/exercise/save', authMiddleware, studentOnly, saveTrackingExercise)
+router.put('/note/student', authMiddleware, studentOnly, saveStudentNote)
+router.put('/profile-photo/:studentId', authMiddleware, studentOnly, updateProfilePhoto)
 
-// ROTAS DO PROFESSOR (ADMIN)
-router.put('/note/teacher', saveTeacherNote)
-router.get('/admin/students', getStudentsTracking)
+// ROTAS DO PROFESSOR (protegidas - ADMIN ONLY)
+router.put('/note/teacher', authMiddleware, adminOnly, saveTeacherNote)
+router.get('/admin/students', authMiddleware, adminOnly, getStudentsTracking)
 
-// RANKING (PÚBLICO)
-router.get('/ranking', getRanking)
+// RANKING (PÚBLICO - mas protegido)
+router.get('/ranking', authMiddleware, getRanking)
 
 export default router
