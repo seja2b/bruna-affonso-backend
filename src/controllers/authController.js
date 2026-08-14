@@ -50,7 +50,7 @@ export const register = async (req, res) => {
       })
     }
 
-    const token = generateToken(user.id)
+    const token = generateToken(user.id, user.role)
     const refreshToken = generateRefreshToken(user.id)
 
     return res.status(201).json({
@@ -89,7 +89,7 @@ export const login = async (req, res) => {
       return res.status(401).json({ error: 'Email ou senha inválidos' })
     }
 
-    const token = generateToken(user.id)
+    const token = generateToken(user.id, user.role)
     const refreshToken = generateRefreshToken(user.id)
 
     return res.json({
@@ -134,5 +134,24 @@ export const getMe = async (req, res) => {
   } catch (error) {
     console.error('Erro ao buscar usuário:', error)
     return res.status(500).json({ error: 'Erro ao buscar usuário' })
+  }
+}
+
+export const debugUser = async (req, res) => {
+  try {
+    const { email } = req.query
+    
+    const user = await prisma.user.findUnique({
+      where: { email },
+      include: { student: true, admin: true }
+    })
+    
+    return res.json({
+      user,
+      message: 'Debug info'
+    })
+  } catch (error) {
+    console.error('Erro:', error)
+    return res.status(500).json({ error: error.message })
   }
 }
