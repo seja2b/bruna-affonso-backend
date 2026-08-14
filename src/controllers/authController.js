@@ -17,12 +17,10 @@ export const register = async (req, res) => {
       return res.status(400).json({ error: 'Email já registrado' })
     }
 
-    // Verificar se já existe ADMIN no banco
     const existingAdmin = await prisma.user.findFirst({
       where: { role: 'ADMIN' }
     })
 
-    // Se não houver admin, o primeiro usuário vira ADMIN
     const role = !existingAdmin ? 'ADMIN' : 'STUDENT'
     const status = role === 'ADMIN' ? 'APPROVED' : 'PENDING'
 
@@ -38,13 +36,11 @@ export const register = async (req, res) => {
       }
     })
 
-    // Criar registro de Student se for aluno
     if (role === 'STUDENT') {
       await prisma.student.create({
         data: { userId: user.id }
       })
     } else {
-      // Criar registro de Admin se for admin
       await prisma.admin.create({
         data: { userId: user.id }
       })
@@ -130,7 +126,19 @@ export const getMe = async (req, res) => {
       return res.status(404).json({ error: 'Usuário não encontrado' })
     }
 
-    return res.json(user)
+    // Se for STUDENT, busca o studentId
+    let studentId = null
+    if (user.role === 'STUDENT') {
+      const student = await prisma.student.findUnique({
+        where: { userId: user.id }
+      })
+      studentId = student?.id || null
+    }
+
+    return res.json({
+      ...user,
+      studentId
+    })
   } catch (error) {
     console.error('Erro ao buscar usuário:', error)
     return res.status(500).json({ error: 'Erro ao buscar usuário' })
