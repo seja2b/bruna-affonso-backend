@@ -10,11 +10,21 @@ const prisma = new PrismaClient()
 const app = express()
 
 // Middleware
-app.use(express.json())
-app.use(cors({
-  origin: process.env.FRONTEND_URL || '*',
-  credentials: true
-}))
+app.use(express.json({ limit: '50mb' }))
+app.use(express.urlencoded({ limit: '50mb', extended: true }))
+
+// CORS
+const corsOptions = {
+  origin: [
+    'https://bruna-affonso-frontend.pages.dev',
+    'http://localhost:3000',
+    'http://localhost:5173'
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}
+app.use(cors(corsOptions))
 
 // Rotas
 app.use('/api/auth', authRoutes)
