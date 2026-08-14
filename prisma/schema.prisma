@@ -8,88 +8,78 @@ datasource db {
 }
 
 model User {
-  id        String     @id @default(cuid())
-  email     String     @unique
-  password  String
-  name      String
-  role      String     @default("STUDENT")
-  status    String     @default("PENDING")
-  phone     String?
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-  
-  student   Student?
-  admin     Admin?
-  questions Question[]
+  id            String     @id @default(cuid())
+  email         String     @unique
+  password      String
+  name          String
+  role          String     @default("STUDENT")
+  status        String     @default("PENDING")
+  phone         String?
+  profilePhoto  String?    @db.Text
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  student       Student?
+  admin         Admin?
+  questions     Question[]
 }
 
 model Student {
-  id        String     @id @default(cuid())
-  userId    String     @unique
-  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  workouts  StudentWorkout[]
-  questions Question[]
-  
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  id                String     @id @default(cuid())
+  userId            String     @unique
+  user              User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workouts          StudentWorkout[]
+  questions         Question[]
+  weeklyTrackings   WeeklyTracking[]
+  ranking           StudentRanking?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
 }
 
 model Admin {
   id        String     @id @default(cuid())
   userId    String     @unique
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 }
 
 model Category {
-  id        String     @id @default(cuid())
-  name      String     @unique
+  id          String    @id @default(cuid())
+  name        String    @unique
   description String?
-  
-  workouts  Workout[]
-  
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  workouts    Workout[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }
 
 model Workout {
-  id          String     @id @default(cuid())
-  title       String
-  description String     @db.Text
-  categoryId  String
-  category    Category   @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  
-  week        Int?
-  module      String?
-  order       Int        @default(0)
-  
-  coverImage  String?
-  videoUrl    String
-  status      String     @default("ACTIVE")
-  
+  id              String     @id @default(cuid())
+  title           String
+  description     String     @db.Text
+  categoryId      String
+  category        Category   @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  week            Int?
+  module          String?
+  order           Int        @default(0)
+  coverImage      String?
+  videoUrl        String
+  status          String     @default("ACTIVE")
   studentWorkouts StudentWorkout[]
-  
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
 }
 
 model StudentWorkout {
   id        String     @id @default(cuid())
   studentId String
   student   Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  
   workoutId String
   workout   Workout    @relation(fields: [workoutId], references: [id], onDelete: Cascade)
-  
   completed Boolean    @default(false)
   progress  Int        @default(0)
-  
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
-  
   @@unique([studentId, workoutId])
 }
 
@@ -97,49 +87,91 @@ model Question {
   id        String     @id @default(cuid())
   studentId String
   student   Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  
   userId    String
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
   title     String
   text      String     @db.Text
   status    String     @default("PENDING")
-  
   answer    Answer?
-  
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 }
 
 model Answer {
-  id        String     @id @default(cuid())
+  id         String    @id @default(cuid())
   questionId String    @unique
-  question  Question   @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  
-  text      String     @db.Text
-  
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  question   Question  @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  text       String    @db.Text
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 }
 
 model Notification {
-  id        String     @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    String
   title     String
-  message   String     @db.Text
+  message   String    @db.Text
   type      String
-  isRead    Boolean    @default(false)
-  
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  isRead    Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 }
 
 model AdminSettings {
-  id        String     @id @default(cuid())
-  phone     String?
-  whatsappUrl String?
+  id                 String    @id @default(cuid())
+  phone              String?
+  whatsappUrl        String?
   motivationalPhrase String?
-  profileImage String?
-  
-  updatedAt DateTime   @updatedAt
+  profileImage       String?
+  updatedAt          DateTime  @updatedAt
+}
+
+model WeeklyTracking {
+  id            String     @id @default(cuid())
+  studentId     String
+  student       Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  weekNumber    Int
+  startDate     DateTime
+  endDate       DateTime
+  isReleased    Boolean    @default(false)
+  isCompleted   Boolean    @default(false)
+  completedAt   DateTime?
+  exercises     TrackingExercise[]
+  observation   WeeklyObservation?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  @@unique([studentId, weekNumber])
+}
+
+model TrackingExercise {
+  id                 String     @id @default(cuid())
+  weeklyTrackingId   String
+  weeklyTracking     WeeklyTracking @relation(fields: [weeklyTrackingId], references: [id], onDelete: Cascade)
+  exerciseName       String
+  trainingType       String
+  weight             String?
+  reps               String?
+  notes              String?    @db.Text
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+}
+
+model WeeklyObservation {
+  id                 String     @id @default(cuid())
+  weeklyTrackingId   String     @unique
+  weeklyTracking     WeeklyTracking @relation(fields: [weeklyTrackingId], references: [id], onDelete: Cascade)
+  studentNote        String?    @db.Text
+  teacherNote        String?    @db.Text
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+}
+
+model StudentRanking {
+  id               String     @id @default(cuid())
+  studentId        String     @unique
+  student          Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  totalPoints      Int        @default(0)
+  weeksCompleted   Int        @default(0)
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
 }
