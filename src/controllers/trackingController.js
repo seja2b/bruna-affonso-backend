@@ -183,11 +183,15 @@ export const getRanking = async (req, res) => {
     const ranking = await prisma.studentRanking.findMany({
       include: {
         student: {
-          select: {
-            id: true,
-            name: true,
-            profilePhoto: true,
-            email: true
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                profilePhoto: true,
+                email: true
+              }
+            }
           }
         }
       },
@@ -197,13 +201,22 @@ export const getRanking = async (req, res) => {
       ]
     })
 
-    // Adiciona posição
-    const rankingWithPosition = ranking.map((item, index) => ({
+    // Formata resposta
+    const rankingFormatted = ranking.map((item, index) => ({
       position: index + 1,
-      ...item
+      id: item.id,
+      studentId: item.studentId,
+      totalPoints: item.totalPoints,
+      weeksCompleted: item.weeksCompleted,
+      student: {
+        id: item.student.user.id,
+        name: item.student.user.name,
+        email: item.student.user.email,
+        profilePhoto: item.student.user.profilePhoto
+      }
     }))
 
-    return res.json(rankingWithPosition)
+    return res.json(rankingFormatted)
   } catch (error) {
     console.error('Error getRanking:', error)
     return res.status(500).json({ error: error.message })
@@ -214,8 +227,17 @@ export const getRanking = async (req, res) => {
 export const getStudentsTracking = async (req, res) => {
   try {
     const students = await prisma.student.findMany({
-      where: { role: 'STUDENT', status: 'APPROVED' },
       include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            role: true,
+            status: true,
+            profilePhoto: true
+          }
+        },
         weeklyTrackings: {
           include: {
             exercises: true,
@@ -227,7 +249,20 @@ export const getStudentsTracking = async (req, res) => {
       }
     })
 
-    return res.json(students)
+    // Filtra apenas alunos aprovados
+    const filteredStudents = students.filter(s => s.user.status === 'APPROVED')
+
+    // Formata resposta
+    const formattedStudents = filteredStudents.map(student => ({
+      id: student.id,
+      name: student.user.name,
+      email: student.user.email,
+      profilePhoto: student.user.profilePhoto,
+      weeklyTrackings: student.weeklyTrackings,
+      ranking: student.ranking
+    }))
+
+    return res.json(formattedStudents)
   } catch (error) {
     console.error('Error getStudentsTracking:', error)
     return res.status(500).json({ error: error.message })
@@ -240,12 +275,22 @@ export const updateProfilePhoto = async (req, res) => {
     const { studentId } = req.params
     const { profilePhoto } = req.body
 
-    const student = await prisma.student.update({
+    // Atualiza foto no User (não em Student)
+    const student = await prisma.student.findUnique({
       where: { id: studentId },
+      select: { userId: true }
+    })
+
+    if (!student) {
+      return res.status(404).json({ error: 'Aluno não encontrado' })
+    }
+
+    const user = await prisma.user.update({
+      where: { id: student.userId },
       data: { profilePhoto }
     })
 
-    return res.json(student)
+    return res.json(user)
   } catch (error) {
     console.error('Error updateProfilePhoto:', error)
     return res.status(500).json({ error: error.message })
@@ -277,7 +322,7 @@ const checkWeekCompletion = async (weeklyTrackingId) => {
       })
 
       // Concede 100 pontos ao aluno
-      const ranking = await prisma.studentRanking.findUnique({
+      let ranking = await prisma.studentRanking.findUnique({
         where: { studentId: week.studentId }
       })
 
