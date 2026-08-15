@@ -7,23 +7,9 @@ export const getStudentWeeks = async (req, res) => {
   try {
     const { studentId } = req.params
 
-    // Se receber userId em vez de studentId, busca o studentId
-    let actualStudentId = studentId
-    
-    if (studentId && studentId.length > 20) {
-      // Parece ser um userId, busca o studentId
-      const student = await prisma.student.findUnique({
-        where: { userId: studentId }
-      })
-      if (!student) {
-        return res.status(404).json({ error: 'Aluno não encontrado' })
-      }
-      actualStudentId = student.id
-    }
-
     // Pega todas as semanas do aluno
     let weeks = await prisma.weeklyTracking.findMany({
-      where: { studentId: actualStudentId },
+      where: { studentId },
       include: {
         exercises: true,
         observation: true
@@ -40,7 +26,7 @@ export const getStudentWeeks = async (req, res) => {
 
       const week1 = await prisma.weeklyTracking.create({
         data: {
-          studentId: actualStudentId,
+          studentId,
           weekNumber: 1,
           startDate,
           endDate,
@@ -101,13 +87,11 @@ export const saveTrackingExercise = async (req, res) => {
     })
 
     if (exercise) {
-      // Atualiza
       exercise = await prisma.trackingExercise.update({
         where: { id: exercise.id },
         data: { weight, reps, notes }
       })
     } else {
-      // Cria novo
       exercise = await prisma.trackingExercise.create({
         data: {
           weeklyTrackingId,
@@ -214,7 +198,6 @@ export const getRanking = async (req, res) => {
       ]
     })
 
-    // Formata resposta
     const rankingFormatted = ranking.map((item, index) => ({
       position: index + 1,
       id: item.id,
@@ -262,10 +245,8 @@ export const getStudentsTracking = async (req, res) => {
       }
     })
 
-    // Filtra apenas alunos aprovados
     const filteredStudents = students.filter(s => s.user.status === 'APPROVED')
 
-    // Formata resposta
     const formattedStudents = filteredStudents.map(student => ({
       id: student.id,
       name: student.user.name,
@@ -288,7 +269,6 @@ export const updateProfilePhoto = async (req, res) => {
     const { studentId } = req.params
     const { profilePhoto } = req.body
 
-    // Busca o student
     const student = await prisma.student.findUnique({
       where: { id: studentId },
       select: { userId: true }
@@ -298,7 +278,6 @@ export const updateProfilePhoto = async (req, res) => {
       return res.status(404).json({ error: 'Aluno não encontrado' })
     }
 
-    // Atualiza foto no User
     const user = await prisma.user.update({
       where: { id: student.userId },
       data: { profilePhoto }
@@ -321,11 +300,9 @@ const checkWeekCompletion = async (weeklyTrackingId) => {
 
     if (!week || week.exercises.length === 0) return
 
-    // Verifica se TODOS os exercícios têm peso e reps preenchidos
     const allFilled = week.exercises.every(ex => ex.weight && ex.reps)
 
     if (allFilled && !week.isCompleted) {
-      // Marca como completa
       await prisma.weeklyTracking.update({
         where: { id: weeklyTrackingId },
         data: {
@@ -334,7 +311,6 @@ const checkWeekCompletion = async (weeklyTrackingId) => {
         }
       })
 
-      // Concede 100 pontos ao aluno
       let ranking = await prisma.studentRanking.findUnique({
         where: { studentId: week.studentId }
       })
