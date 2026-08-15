@@ -13,7 +13,7 @@ import {
 const router = express.Router()
 
 // ROTAS DO ALUNO (protegidas)
-router.get('/student/:studentId/weeks', authMiddleware, studentOnly, getStudentWeeks)
+router.get('/student/:studentId/weeks', authMiddleware, getStudentWeeks)
 router.post('/exercise/save', authMiddleware, studentOnly, saveTrackingExercise)
 router.put('/note/student', authMiddleware, studentOnly, saveStudentNote)
 router.put('/profile-photo/:studentId', authMiddleware, studentOnly, updateProfilePhoto)
@@ -22,7 +22,7 @@ router.put('/profile-photo/:studentId', authMiddleware, studentOnly, updateProfi
 router.put('/note/teacher', authMiddleware, adminOnly, saveTeacherNote)
 router.get('/admin/students', authMiddleware, adminOnly, getStudentsTracking)
 
-// RANKING (PÚBLICO - mas protegido)
+// RANKING (protegido)
 router.get('/ranking', authMiddleware, getRanking)
 
 export default router
