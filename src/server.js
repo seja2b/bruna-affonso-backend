@@ -18,7 +18,8 @@ const corsOptions = {
   origin: [
     'https://bruna-affonso-frontend.pages.dev',
     'http://localhost:3000',
-    'http://localhost:5173'
+    'http://localhost:5173',
+    'http://localhost:5174'
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
