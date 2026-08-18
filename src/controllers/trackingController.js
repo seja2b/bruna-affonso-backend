@@ -4,7 +4,7 @@ const prisma = new PrismaClient()
 
 export async function getStudentWeeks(req, res) {
   try {
-    const userId = req.user.id
+    const userId = req.user.userId
     
     const student = await prisma.student.findUnique({
       where: { userId },
@@ -72,7 +72,7 @@ export async function getStudentWeeks(req, res) {
 export async function saveTrackingExercise(req, res) {
   try {
     const { weekId, exercises } = req.body
-    const userId = req.user.id
+    const userId = req.user.userId
 
     const student = await prisma.student.findUnique({
       where: { userId },
@@ -110,7 +110,7 @@ export async function saveTrackingExercise(req, res) {
 export async function saveStudentNote(req, res) {
   try {
     const { weekId, studentNote } = req.body
-    const userId = req.user.id
+    const userId = req.user.userId
 
     const student = await prisma.student.findUnique({
       where: { userId },
@@ -247,7 +247,7 @@ export async function updateProfilePhoto(req, res) {
   try {
     const { studentId } = req.params
     const { profilePhoto } = req.body
-    const userId = req.user.id
+    const userId = req.user.userId
 
     const student = await prisma.student.findUnique({
       where: { id: studentId },
