@@ -39,3 +39,8 @@ jobs:
 
       - name: Check server imports
         run: node --check src/server.js
+
+      - name: Validate production start command
+        run: |
+          grep -qx 'web: node src/server.js' Procfile.txt
+          test -f src/server.js
