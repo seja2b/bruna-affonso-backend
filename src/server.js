@@ -9,6 +9,7 @@ import trackingRoutes from './routes/trackingRoutes.js'
 import workoutRoutes from './routes/workoutRoutes.js'
 import questionRoutes from './routes/questionRoutes.js'
 import videoRoutes from './routes/videoRoutes.js'
+import notificationRoutes from './routes/notificationRoutes.js'
 import authMiddleware from './middleware/authMiddleware.js'
 
 dotenv.config()
@@ -72,6 +73,7 @@ app.use('/api/tracking', trackingRoutes)
 app.use('/api/workouts', workoutRoutes)
 app.use('/api/questions', questionRoutes)
 app.use('/api/videos', videoRoutes)
+app.use('/api/notifications', notificationRoutes)
 
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() })
