@@ -1,7 +1,7 @@
 import express from 'express'
 import authMiddleware from '../middleware/authMiddleware.js'
 import { createRateLimiter } from '../middleware/rateLimitMiddleware.js'
-import { login, register, refreshSession, getMe, logout } from '../controllers/authController.js'
+import { login, register, refreshSession, getMe, updateMe, logout } from '../controllers/authController.js'
 
 const router = express.Router()
 
@@ -17,5 +17,6 @@ router.post('/refresh', refreshLimiter, refreshSession)
 // Protegidas
 router.post('/logout', authMiddleware, logout)
 router.get('/me', authMiddleware, getMe)
+router.put('/me', authMiddleware, updateMe)
 
 export default router
