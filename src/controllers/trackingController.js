@@ -29,6 +29,15 @@ export async function getStudentWeeks(req, res) {
     if (weeks.length === 0) {
       const startDate = new Date()
       
+      // Exercícios padrão para cada semana
+      const defaultExercises = [
+        { exerciseName: 'Supino Reto', trainingType: 'Força', weight: null, reps: null },
+        { exerciseName: 'Rosca Direta', trainingType: 'Força', weight: null, reps: null },
+        { exerciseName: 'Puxada Alta', trainingType: 'Força', weight: null, reps: null },
+        { exerciseName: 'Agachamento', trainingType: 'Força', weight: null, reps: null },
+        { exerciseName: 'Leg Press', trainingType: 'Força', weight: null, reps: null }
+      ]
+      
       for (let i = 1; i <= 52; i++) {
         const weekStart = new Date(startDate)
         weekStart.setDate(weekStart.getDate() + (i - 1) * 7)
@@ -40,7 +49,8 @@ export async function getStudentWeeks(req, res) {
           (new Date() - startDate) / (1000 * 60 * 60 * 24 * 7)
         )
 
-        await prisma.weeklyTracking.create({
+        // Criar a semana
+        const week = await prisma.weeklyTracking.create({
           data: {
             studentId,
             weekNumber: i,
@@ -50,8 +60,22 @@ export async function getStudentWeeks(req, res) {
             isCompleted: false
           }
         })
+
+        // Criar exercícios padrão para a semana
+        for (let exercise of defaultExercises) {
+          await prisma.trackingExercise.create({
+            data: {
+              weeklyTrackingId: week.id,
+              exerciseName: exercise.exerciseName,
+              trainingType: exercise.trainingType,
+              weight: exercise.weight,
+              reps: exercise.reps
+            }
+          })
+        }
       }
 
+      // Buscar novamente as semanas criadas
       weeks = await prisma.weeklyTracking.findMany({
         where: { studentId },
         include: {
