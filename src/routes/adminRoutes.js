@@ -2,7 +2,6 @@ import express from 'express'
 import authMiddleware from '../middleware/authMiddleware.js'
 import { requireRole } from '../middleware/roleMiddleware.js'
 import {
-  getDashboard,
   getStudents,
   getStudentDetails,
   approveStudent,
@@ -18,13 +17,14 @@ import {
   getSettings,
   updateSettings
 } from '../controllers/adminController.js'
+import { getAdminDashboard } from '../controllers/adminDashboardController.js'
 import { getAdminQuestions, answerQuestionWithNotification } from '../controllers/adminQuestionController.js'
 
 const router = express.Router()
 
 router.use(authMiddleware, requireRole('ADMIN'))
 
-router.get('/dashboard', getDashboard)
+router.get('/dashboard', getAdminDashboard)
 
 router.get('/students', getStudents)
 router.get('/students/:studentId', getStudentDetails)
