@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client'
+import { createNotifications } from '../services/notificationService.js'
 
 const prisma = new PrismaClient()
 
@@ -42,13 +43,29 @@ export async function createVideo(req, res) {
     const validationError = validateVideoPayload(payload)
     if (validationError) return res.status(400).json({ error: validationError })
 
-    const video = await prisma.video.create({
-      data: {
-        title: payload.title,
-        description: payload.description || null,
-        category: payload.category || null,
-        videoUrl: payload.videoUrl
-      }
+    const video = await prisma.$transaction(async (tx) => {
+      const created = await tx.video.create({
+        data: {
+          title: payload.title,
+          description: payload.description || null,
+          category: payload.category || null,
+          videoUrl: payload.videoUrl
+        }
+      })
+
+      const approvedStudents = await tx.user.findMany({
+        where: { role: 'STUDENT', status: 'APPROVED' },
+        select: { id: true }
+      })
+
+      await createNotifications(tx, approvedStudents.map((student) => ({
+        userId: student.id,
+        title: 'Nova VideoAula disponível',
+        message: `A aula “${created.title}” já está disponível na sua biblioteca de VideoAulas.`,
+        type: 'VIDEO_CLASS_PUBLISHED'
+      })))
+
+      return created
     })
 
     return res.status(201).json(video)
