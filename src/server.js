@@ -4,8 +4,10 @@ import dotenv from 'dotenv'
 import { PrismaClient } from '@prisma/client'
 import authRoutes from './routes/authRoutes.js'
 import adminRoutes from './routes/adminRoutes.js'
+import settingsRoutes from './routes/settingsRoutes.js'
 import trackingRoutes from './routes/trackingRoutes.js'
 import workoutRoutes from './routes/workoutRoutes.js'
+import authMiddleware from './middleware/authMiddleware.js'
 
 dotenv.config()
 
@@ -57,6 +59,12 @@ app.use(express.json({ limit: requestBodyLimit }))
 app.use(express.urlencoded({ limit: requestBodyLimit, extended: true }))
 
 app.use('/api/auth', authRoutes)
+
+// Compatibilidade: alunos já consomem /api/admin/settings para dados públicos da plataforma.
+// A leitura continua disponível apenas para usuários autenticados; escrita exige ADMIN.
+app.use('/api/admin/settings', authMiddleware, settingsRoutes)
+app.use('/api/settings', authMiddleware, settingsRoutes)
+
 app.use('/api/admin', adminRoutes)
 app.use('/api/tracking', trackingRoutes)
 app.use('/api/workouts', workoutRoutes)
