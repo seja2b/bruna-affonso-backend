@@ -1,20 +1,28 @@
 import jwt from 'jsonwebtoken'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'seu-secreto'
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'seu-refresh-secreto'
+const JWT_SECRET = process.env.JWT_SECRET || 'secret_key'
+const REFRESH_SECRET = process.env.REFRESH_SECRET || 'refresh_secret'
 
-export const generateToken = (userId, role) => {
-  return jwt.sign({ userId, role }, JWT_SECRET, { expiresIn: '24h' })
+export function generateToken(userId, role) {
+  return jwt.sign({ userId, role }, JWT_SECRET, { expiresIn: '7d' })
 }
 
-export const generateRefreshToken = (userId) => {
-  return jwt.sign({ userId }, JWT_REFRESH_SECRET, { expiresIn: '7d' })
+export function generateRefreshToken(userId) {
+  return jwt.sign({ userId }, REFRESH_SECRET, { expiresIn: '30d' })
 }
 
-export const verifyToken = (token) => {
+export function verifyToken(token) {
   try {
     return jwt.verify(token, JWT_SECRET)
-  } catch {
+  } catch (error) {
+    return null
+  }
+}
+
+export function verifyRefreshToken(token) {
+  try {
+    return jwt.verify(token, REFRESH_SECRET)
+  } catch (error) {
     return null
   }
 }
