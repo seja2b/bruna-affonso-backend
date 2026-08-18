@@ -3,6 +3,33 @@ import { createNotification } from '../services/notificationService.js'
 
 const prisma = new PrismaClient()
 
+export async function getAdminQuestions(req, res) {
+  try {
+    const questions = await prisma.question.findMany({
+      include: {
+        answer: true,
+        user: { select: { id: true, name: true, email: true, profilePhoto: true } }
+      },
+      orderBy: { createdAt: 'desc' }
+    })
+
+    return res.json(questions.map((question) => ({
+      id: question.id,
+      title: question.title,
+      text: question.text,
+      status: question.status,
+      createdAt: question.createdAt,
+      updatedAt: question.updatedAt,
+      answeredAt: question.answer?.createdAt || null,
+      answer: question.answer?.text || null,
+      user: question.user
+    })))
+  } catch (error) {
+    console.error('Erro ao buscar perguntas do admin:', error)
+    return res.status(500).json({ error: 'Erro ao buscar perguntas' })
+  }
+}
+
 export async function answerQuestionWithNotification(req, res) {
   try {
     const { questionId } = req.params
