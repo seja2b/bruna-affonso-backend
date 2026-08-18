@@ -169,3 +169,53 @@ export const getMe = async (req, res) => {
     return res.status(500).json({ error: 'Erro ao buscar usuário' })
   }
 }
+
+export const updateMe = async (req, res) => {
+  try {
+    const userId = req.user.userId
+    const name = typeof req.body.name === 'string' ? req.body.name.trim() : ''
+    const phone = typeof req.body.phone === 'string' ? req.body.phone.trim() : ''
+    const profilePhoto = typeof req.body.profilePhoto === 'string' ? req.body.profilePhoto.trim() : ''
+
+    if (name.length < 2 || name.length > 120) {
+      return res.status(400).json({ error: 'O nome deve ter entre 2 e 120 caracteres' })
+    }
+
+    if (phone.length > 30) {
+      return res.status(400).json({ error: 'Telefone inválido' })
+    }
+
+    if (profilePhoto && profilePhoto.length > 5_000_000) {
+      return res.status(400).json({ error: 'Foto de perfil muito grande' })
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        name,
+        phone: phone || null,
+        profilePhoto: profilePhoto || null
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        status: true,
+        phone: true,
+        profilePhoto: true
+      }
+    })
+
+    let studentId = null
+    if (updated.role === 'STUDENT') {
+      const student = await prisma.student.findUnique({ where: { userId: updated.id }, select: { id: true } })
+      studentId = student?.id || null
+    }
+
+    return res.json({ ...updated, studentId })
+  } catch (error) {
+    console.error('Erro ao atualizar perfil:', error)
+    return res.status(500).json({ error: 'Erro ao atualizar perfil' })
+  }
+}
