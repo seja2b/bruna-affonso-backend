@@ -4,6 +4,7 @@ import { requireRole } from '../middleware/roleMiddleware.js'
 import {
   getStudentWeeks,
   saveTrackingExercise,
+  completeWeek,
   saveStudentNote,
   saveTeacherNote,
   getAdminStudentWeeks,
@@ -22,6 +23,7 @@ router.use(authMiddleware)
 router.get('/student/:studentId/weeks', requireRole('STUDENT'), getStudentWeeks)
 router.get('/week/:weekId', requireRole('STUDENT'), getStudentWeeks)
 router.post('/exercise/save', requireRole('STUDENT'), saveTrackingExercise)
+router.post('/week/:weekId/complete', requireRole('STUDENT'), completeWeek)
 router.put('/note/student', requireRole('STUDENT'), saveStudentNote)
 router.put('/profile-photo/:studentId', requireRole('STUDENT'), updateProfilePhoto)
 
