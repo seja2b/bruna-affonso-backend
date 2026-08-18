@@ -219,3 +219,29 @@ export async function saveProfilePhoto(req, res) {
     res.status(500).json({ error: 'Erro ao salvar foto' })
   }
 }
+
+export async function getRanking(req, res) {
+  try {
+    const ranking = await prisma.studentRanking.findMany({
+      include: {
+        student: {
+          include: {
+            user: {
+              select: {
+                name: true,
+                email: true,
+                profilePhoto: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: { totalPoints: 'desc' }
+    })
+
+    res.json(ranking)
+  } catch (error) {
+    console.error('Error getRanking:', error)
+    res.status(500).json({ error: 'Erro ao buscar ranking' })
+  }
+}
