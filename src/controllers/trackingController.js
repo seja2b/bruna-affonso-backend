@@ -2,12 +2,23 @@ import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
-// GET todas as semanas do aluno
-export const getStudentWeeks = async (req, res) => {
+export async function getStudentWeeks(req, res) {
   try {
-    const { studentId } = req.params
+    const userId = req.user.id // ID do USER, não do Student
+    
+    // PASSO 1: Buscar o Student usando o userId
+    const student = await prisma.student.findUnique({
+      where: { userId },
+      select: { id: true }
+    })
 
-    // Pega todas as semanas do aluno
+    if (!student) {
+      return res.status(404).json({ error: 'Aluno não encontrado' })
+    }
+
+    const studentId = student.id
+
+    // PASSO 2: Buscar as semanas do aluno
     let weeks = await prisma.weeklyTracking.findMany({
       where: { studentId },
       include: {
@@ -17,323 +28,194 @@ export const getStudentWeeks = async (req, res) => {
       orderBy: { weekNumber: 'asc' }
     })
 
-    // Se não houver semanas, cria a primeira
+    // PASSO 3: Se não tiver semanas, criar as 52 semanas
     if (weeks.length === 0) {
       const startDate = new Date()
-      startDate.setDate(startDate.getDate() - startDate.getDay() + 1)
-      const endDate = new Date(startDate)
-      endDate.setDate(endDate.getDate() + 6)
+      
+      for (let i = 1; i <= 52; i++) {
+        const weekStart = new Date(startDate)
+        weekStart.setDate(weekStart.getDate() + (i - 1) * 7)
+        
+        const weekEnd = new Date(weekStart)
+        weekEnd.setDate(weekEnd.getDate() + 6)
 
-      const week1 = await prisma.weeklyTracking.create({
-        data: {
-          studentId,
-          weekNumber: 1,
-          startDate,
-          endDate,
-          isReleased: true
-        },
-        include: { exercises: true, observation: true }
-      })
-      weeks = [week1]
-    }
+        const currentWeek = Math.ceil(
+          (new Date() - startDate) / (1000 * 60 * 60 * 24 * 7)
+        )
 
-    // Valida liberação automática
-    for (let i = 1; i < weeks.length; i++) {
-      const previousWeek = weeks[i - 1]
-      const currentWeek = weeks[i]
-
-      if (previousWeek.isCompleted && previousWeek.completedAt) {
-        const sevenDaysLater = new Date(previousWeek.completedAt)
-        sevenDaysLater.setDate(sevenDaysLater.getDate() + 7)
-
-        if (new Date() >= sevenDaysLater && !currentWeek.isReleased) {
-          await prisma.weeklyTracking.update({
-            where: { id: currentWeek.id },
-            data: { isReleased: true }
-          })
-          currentWeek.isReleased = true
-        }
+        await prisma.weeklyTracking.create({
+          data: {
+            studentId,
+            weekNumber: i,
+            startDate: weekStart,
+            endDate: weekEnd,
+            isReleased: i <= currentWeek + 1,
+            isCompleted: false
+          }
+        })
       }
+
+      // Buscar novamente as semanas criadas
+      weeks = await prisma.weeklyTracking.findMany({
+        where: { studentId },
+        include: {
+          exercises: true,
+          observation: true
+        },
+        orderBy: { weekNumber: 'asc' }
+      })
     }
 
-    return res.json(weeks)
+    res.json(weeks)
   } catch (error) {
     console.error('Error getStudentWeeks:', error)
-    return res.status(500).json({ error: error.message })
+    res.status(500).json({ error: 'Erro ao buscar semanas' })
   }
 }
 
-// POST/PUT exercício de tracking
-export const saveTrackingExercise = async (req, res) => {
+export async function getWeekDetails(req, res) {
   try {
-    const { weeklyTrackingId, exerciseName, trainingType, weight, reps, notes } = req.body
+    const { weekId } = req.params
+    const userId = req.user.id
 
-    // Valida se semana existe e está liberada
-    const week = await prisma.weeklyTracking.findUnique({
-      where: { id: weeklyTrackingId }
-    })
-
-    if (!week || !week.isReleased) {
-      return res.status(403).json({ error: 'Semana não liberada' })
-    }
-
-    // Procura exercício existente
-    let exercise = await prisma.trackingExercise.findFirst({
-      where: {
-        weeklyTrackingId,
-        exerciseName,
-        trainingType
-      }
-    })
-
-    if (exercise) {
-      exercise = await prisma.trackingExercise.update({
-        where: { id: exercise.id },
-        data: { weight, reps, notes }
-      })
-    } else {
-      exercise = await prisma.trackingExercise.create({
-        data: {
-          weeklyTrackingId,
-          exerciseName,
-          trainingType,
-          weight,
-          reps,
-          notes
-        }
-      })
-    }
-
-    // Verifica se semana está completa
-    await checkWeekCompletion(weeklyTrackingId)
-
-    return res.json(exercise)
-  } catch (error) {
-    console.error('Error saveTrackingExercise:', error)
-    return res.status(500).json({ error: error.message })
-  }
-}
-
-// PUT observação do aluno
-export const saveStudentNote = async (req, res) => {
-  try {
-    const { weeklyTrackingId, studentNote } = req.body
-
-    let observation = await prisma.weeklyObservation.findUnique({
-      where: { weeklyTrackingId }
-    })
-
-    if (observation) {
-      observation = await prisma.weeklyObservation.update({
-        where: { weeklyTrackingId },
-        data: { studentNote }
-      })
-    } else {
-      observation = await prisma.weeklyObservation.create({
-        data: {
-          weeklyTrackingId,
-          studentNote
-        }
-      })
-    }
-
-    return res.json(observation)
-  } catch (error) {
-    console.error('Error saveStudentNote:', error)
-    return res.status(500).json({ error: error.message })
-  }
-}
-
-// PUT observação do professor (ADMIN ONLY)
-export const saveTeacherNote = async (req, res) => {
-  try {
-    const { weeklyTrackingId, teacherNote } = req.body
-
-    let observation = await prisma.weeklyObservation.findUnique({
-      where: { weeklyTrackingId }
-    })
-
-    if (observation) {
-      observation = await prisma.weeklyObservation.update({
-        where: { weeklyTrackingId },
-        data: { teacherNote }
-      })
-    } else {
-      observation = await prisma.weeklyObservation.create({
-        data: {
-          weeklyTrackingId,
-          teacherNote
-        }
-      })
-    }
-
-    return res.json(observation)
-  } catch (error) {
-    console.error('Error saveTeacherNote:', error)
-    return res.status(500).json({ error: error.message })
-  }
-}
-
-// GET ranking de alunos
-export const getRanking = async (req, res) => {
-  try {
-    const ranking = await prisma.studentRanking.findMany({
-      include: {
-        student: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                profilePhoto: true,
-                email: true
-              }
-            }
-          }
-        }
-      },
-      orderBy: [
-        { totalPoints: 'desc' },
-        { weeksCompleted: 'desc' }
-      ]
-    })
-
-    const rankingFormatted = ranking.map((item, index) => ({
-      position: index + 1,
-      id: item.id,
-      studentId: item.studentId,
-      totalPoints: item.totalPoints,
-      weeksCompleted: item.weeksCompleted,
-      student: {
-        id: item.student.user.id,
-        name: item.student.user.name,
-        email: item.student.user.email,
-        profilePhoto: item.student.user.profilePhoto
-      }
-    }))
-
-    return res.json(rankingFormatted)
-  } catch (error) {
-    console.error('Error getRanking:', error)
-    return res.status(500).json({ error: error.message })
-  }
-}
-
-// GET alunos para admin (com tracking)
-export const getStudentsTracking = async (req, res) => {
-  try {
-    const students = await prisma.student.findMany({
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            name: true,
-            role: true,
-            status: true,
-            profilePhoto: true
-          }
-        },
-        weeklyTrackings: {
-          include: {
-            exercises: true,
-            observation: true
-          },
-          orderBy: { weekNumber: 'asc' }
-        },
-        ranking: true
-      }
-    })
-
-    const filteredStudents = students.filter(s => s.user.status === 'APPROVED')
-
-    const formattedStudents = filteredStudents.map(student => ({
-      id: student.id,
-      name: student.user.name,
-      email: student.user.email,
-      profilePhoto: student.user.profilePhoto,
-      weeklyTrackings: student.weeklyTrackings,
-      ranking: student.ranking
-    }))
-
-    return res.json(formattedStudents)
-  } catch (error) {
-    console.error('Error getStudentsTracking:', error)
-    return res.status(500).json({ error: error.message })
-  }
-}
-
-// PUT foto do perfil do aluno
-export const updateProfilePhoto = async (req, res) => {
-  try {
-    const { studentId } = req.params
-    const { profilePhoto } = req.body
-
+    // Verificar se o aluno tem acesso a essa semana
     const student = await prisma.student.findUnique({
-      where: { id: studentId },
-      select: { userId: true }
+      where: { userId },
+      select: { id: true }
     })
 
     if (!student) {
       return res.status(404).json({ error: 'Aluno não encontrado' })
     }
 
-    const user = await prisma.user.update({
-      where: { id: student.userId },
-      data: { profilePhoto }
+    const week = await prisma.weeklyTracking.findFirst({
+      where: {
+        id: weekId,
+        studentId: student.id
+      },
+      include: {
+        exercises: true,
+        observation: true
+      }
     })
 
-    return res.json(user)
+    if (!week) {
+      return res.status(404).json({ error: 'Semana não encontrada' })
+    }
+
+    res.json(week)
   } catch (error) {
-    console.error('Error updateProfilePhoto:', error)
-    return res.status(500).json({ error: error.message })
+    console.error('Error getWeekDetails:', error)
+    res.status(500).json({ error: 'Erro ao buscar semana' })
   }
 }
 
-// ===== FUNÇÃO AUXILIAR =====
-const checkWeekCompletion = async (weeklyTrackingId) => {
+export async function saveExercises(req, res) {
   try {
-    const week = await prisma.weeklyTracking.findUnique({
-      where: { id: weeklyTrackingId },
-      include: { exercises: true }
+    const { weekId, exercises } = req.body
+    const userId = req.user.id
+
+    // Verificar se o aluno tem acesso
+    const student = await prisma.student.findUnique({
+      where: { userId },
+      select: { id: true }
     })
 
-    if (!week || week.exercises.length === 0) return
+    if (!student) {
+      return res.status(404).json({ error: 'Aluno não encontrado' })
+    }
 
-    const allFilled = week.exercises.every(ex => ex.weight && ex.reps)
+    // Atualizar exercícios
+    await prisma.trackingExercise.deleteMany({
+      where: { weeklyTrackingId: weekId }
+    })
 
-    if (allFilled && !week.isCompleted) {
-      await prisma.weeklyTracking.update({
-        where: { id: weeklyTrackingId },
+    for (let exercise of exercises) {
+      await prisma.trackingExercise.create({
         data: {
-          isCompleted: true,
-          completedAt: new Date()
+          weeklyTrackingId: weekId,
+          exerciseName: exercise.exerciseName,
+          trainingType: exercise.trainingType,
+          weight: exercise.weight || null,
+          reps: exercise.reps || null,
+          notes: exercise.notes || null
         }
       })
-
-      let ranking = await prisma.studentRanking.findUnique({
-        where: { studentId: week.studentId }
-      })
-
-      if (ranking) {
-        await prisma.studentRanking.update({
-          where: { id: ranking.id },
-          data: {
-            totalPoints: ranking.totalPoints + 100,
-            weeksCompleted: ranking.weeksCompleted + 1
-          }
-        })
-      } else {
-        await prisma.studentRanking.create({
-          data: {
-            studentId: week.studentId,
-            totalPoints: 100,
-            weeksCompleted: 1
-          }
-        })
-      }
     }
+
+    res.json({ message: 'Exercícios salvos com sucesso' })
   } catch (error) {
-    console.error('Error checkWeekCompletion:', error)
+    console.error('Error saveExercises:', error)
+    res.status(500).json({ error: 'Erro ao salvar exercícios' })
+  }
+}
+
+export async function saveStudentNote(req, res) {
+  try {
+    const { weekId, studentNote } = req.body
+    const userId = req.user.id
+
+    // Verificar se o aluno tem acesso
+    const student = await prisma.student.findUnique({
+      where: { userId },
+      select: { id: true }
+    })
+
+    if (!student) {
+      return res.status(404).json({ error: 'Aluno não encontrado' })
+    }
+
+    // Atualizar ou criar observação
+    let observation = await prisma.weeklyObservation.findUnique({
+      where: { weeklyTrackingId: weekId }
+    })
+
+    if (observation) {
+      observation = await prisma.weeklyObservation.update({
+        where: { weeklyTrackingId: weekId },
+        data: { studentNote }
+      })
+    } else {
+      observation = await prisma.weeklyObservation.create({
+        data: {
+          weeklyTrackingId: weekId,
+          studentNote
+        }
+      })
+    }
+
+    res.json({ message: 'Observação salva com sucesso', observation })
+  } catch (error) {
+    console.error('Error saveStudentNote:', error)
+    res.status(500).json({ error: 'Erro ao salvar observação' })
+  }
+}
+
+export async function saveProfilePhoto(req, res) {
+  try {
+    const { studentId } = req.params
+    const { profilePhoto } = req.body
+    const userId = req.user.id
+
+    // Verificar se o aluno está atualizando sua própria foto
+    const student = await prisma.student.findUnique({
+      where: { id: studentId },
+      select: { userId: true }
+    })
+
+    if (!student || student.userId !== userId) {
+      return res.status(403).json({ error: 'Acesso negado' })
+    }
+
+    // Atualizar foto do usuário
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: { profilePhoto }
+    })
+
+    res.json({ message: 'Foto salva com sucesso', user })
+  } catch (error) {
+    console.error('Error saveProfilePhoto:', error)
+    res.status(500).json({ error: 'Erro ao salvar foto' })
   }
 }

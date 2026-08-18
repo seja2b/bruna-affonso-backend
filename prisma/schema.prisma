@@ -121,9 +121,9 @@ model AdminSettings {
   id                 String    @id @default(cuid())
   phone              String?
   whatsappUrl        String?
-  motivationalPhrase String?
-  profileImage       String?
-  logo               String?
+  motivationalPhrase String?   @db.Text
+  profileImage       String?   @db.Text
+  logo               String?   @db.Text
   createdAt          DateTime   @default(now())
   updatedAt          DateTime   @updatedAt
 }
