@@ -1,13 +1,18 @@
 import jwt from 'jsonwebtoken'
 
-function getRequiredSecret(name) {
-  const secret = process.env[name]
+function getRequiredSecret(name, legacyName = null) {
+  const secret = process.env[name] || (legacyName ? process.env[legacyName] : null)
 
   if (!secret || secret.trim().length < 32) {
-    throw new Error(`${name} deve estar configurado com pelo menos 32 caracteres`)
+    const acceptedNames = legacyName ? `${name} (ou temporariamente ${legacyName})` : name
+    throw new Error(`${acceptedNames} deve estar configurado com pelo menos 32 caracteres`)
   }
 
   return secret
+}
+
+function getRefreshSecret() {
+  return getRequiredSecret('REFRESH_SECRET', 'JWT_REFRESH_SECRET')
 }
 
 export function generateToken(userId, role) {
@@ -15,7 +20,7 @@ export function generateToken(userId, role) {
 }
 
 export function generateRefreshToken(userId) {
-  return jwt.sign({ userId }, getRequiredSecret('REFRESH_SECRET'), { expiresIn: '30d' })
+  return jwt.sign({ userId }, getRefreshSecret(), { expiresIn: '30d' })
 }
 
 export function verifyToken(token) {
@@ -28,7 +33,7 @@ export function verifyToken(token) {
 
 export function verifyRefreshToken(token) {
   try {
-    return jwt.verify(token, getRequiredSecret('REFRESH_SECRET'))
+    return jwt.verify(token, getRefreshSecret())
   } catch (error) {
     return null
   }
