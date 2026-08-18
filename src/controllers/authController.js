@@ -105,6 +105,17 @@ export const login = async (req, res) => {
   }
 }
 
+export const logout = async (req, res) => {
+  try {
+    // No JWT, o logout é feito no frontend deletando o token
+    // Apenas confirmamos que o logout foi solicitado
+    return res.json({ message: 'Logout realizado com sucesso' })
+  } catch (error) {
+    console.error('Erro ao fazer logout:', error)
+    return res.status(500).json({ error: 'Erro ao fazer logout' })
+  }
+}
+
 export const getMe = async (req, res) => {
   try {
     const userId = req.user.userId
