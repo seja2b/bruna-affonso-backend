@@ -4,11 +4,9 @@ const prisma = new PrismaClient()
 
 export async function getSettings(req, res) {
   try {
-    // Buscar settings, se não existir retornar vazio
     let settings = await prisma.adminSettings.findFirst()
     
     if (!settings) {
-      // Se não existir, criar um registro vazio
       settings = await prisma.adminSettings.create({
         data: {
           phone: '',
@@ -31,11 +29,9 @@ export async function updateSettings(req, res) {
   try {
     const { phone, whatsappUrl, motivationalPhrase, profileImage, logo } = req.body
     
-    // Buscar settings existente
     let settings = await prisma.adminSettings.findFirst()
     
     if (!settings) {
-      // Se não existir, criar
       settings = await prisma.adminSettings.create({
         data: {
           phone: phone || '',
@@ -46,15 +42,14 @@ export async function updateSettings(req, res) {
         }
       })
     } else {
-      // Se existir, atualizar
       settings = await prisma.adminSettings.update({
         where: { id: settings.id },
         data: {
-          phone: phone || settings.phone,
-          whatsappUrl: whatsappUrl || settings.whatsappUrl,
-          motivationalPhrase: motivationalPhrase || settings.motivationalPhrase,
-          profileImage: profileImage || settings.profileImage,
-          logo: logo || settings.logo
+          ...(phone !== undefined && { phone }),
+          ...(whatsappUrl !== undefined && { whatsappUrl }),
+          ...(motivationalPhrase !== undefined && { motivationalPhrase }),
+          ...(profileImage !== undefined && { profileImage }),
+          ...(logo !== undefined && { logo })
         }
       })
     }
