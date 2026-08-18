@@ -7,6 +7,9 @@ import adminRoutes from './routes/adminRoutes.js'
 import settingsRoutes from './routes/settingsRoutes.js'
 import trackingRoutes from './routes/trackingRoutes.js'
 import workoutRoutes from './routes/workoutRoutes.js'
+import questionRoutes from './routes/questionRoutes.js'
+import videoRoutes from './routes/videoRoutes.js'
+import notificationRoutes from './routes/notificationRoutes.js'
 import authMiddleware from './middleware/authMiddleware.js'
 
 dotenv.config()
@@ -14,92 +17,97 @@ dotenv.config()
 const app = express()
 const prisma = new PrismaClient()
 const PORT = process.env.PORT || 3000
+const isProduction = process.env.NODE_ENV === 'production'
 
-// CORS CONFIGURAÇÃO - ACEITA CLOUDFLARE + LOCALHOST + CODESPACES
-const allowedOrigins = [
-  'https://bruna-affonso-frontend.pages.dev',
-  'http://localhost:5173',
-  'http://localhost:3000',
-  'http://127.0.0.1:5173',
-  /\.app\.github\.dev$/ // Aceita qualquer Codespace
-]
+function parseAllowedOrigins() {
+  const configured = (process.env.CORS_ORIGINS || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean)
+
+  if (configured.length > 0) return configured
+
+  return [
+    'https://bruna-affonso-frontend.pages.dev',
+    ...(!isProduction ? [
+      'http://localhost:5173',
+      'http://localhost:3000',
+      'http://127.0.0.1:5173'
+    ] : [])
+  ]
+}
+
+const allowedOrigins = parseAllowedOrigins()
 
 const corsOptions = {
-  origin: function (origin, callback) {
-    // Permitir requests sem origin (mobile, curl, etc)
+  origin(origin, callback) {
     if (!origin) return callback(null, true)
-    
-    // Verificar se é uma origem permitida
-    const isAllowed = allowedOrigins.some(allowed => {
-      if (allowed instanceof RegExp) {
-        return allowed.test(origin)
-      }
-      return allowed === origin
-    })
 
-    if (isAllowed) {
-      callback(null, true)
-    } else {
-      callback(new Error('CORS não permitido'))
-    }
+    const isConfiguredOrigin = allowedOrigins.includes(origin)
+    const isDevCodespace = !isProduction && /\.app\.github\.dev$/.test(origin)
+
+    if (isConfiguredOrigin || isDevCodespace) return callback(null, true)
+    return callback(new Error('Origem não permitida pelo CORS'))
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }
 
-// Middleware
-app.use(cors(corsOptions))
-app.use(express.json({ limit: '50mb' }))
-app.use(express.urlencoded({ limit: '50mb', extended: true }))
+const requestBodyLimit = process.env.REQUEST_BODY_LIMIT || '6mb'
 
-// Rotas públicas
+app.disable('x-powered-by')
+app.use(cors(corsOptions))
+app.use(express.json({ limit: requestBodyLimit }))
+app.use(express.urlencoded({ limit: requestBodyLimit, extended: true }))
+
 app.use('/api/auth', authRoutes)
 
-// Rotas protegidas (requerem autenticação)
-app.use('/api/admin', authMiddleware, adminRoutes)
-app.use('/api/admin/settings', settingsRoutes)
-app.use('/api/tracking', authMiddleware, trackingRoutes)
-app.use('/api/workouts', workoutRoutes)
+// Compatibilidade: alunos já consomem /api/admin/settings para dados públicos da plataforma.
+// A leitura continua disponível apenas para usuários autenticados; escrita exige ADMIN.
+app.use('/api/admin/settings', authMiddleware, settingsRoutes)
+app.use('/api/settings', authMiddleware, settingsRoutes)
 
-// Health check
+app.use('/api/admin', adminRoutes)
+app.use('/api/tracking', trackingRoutes)
+app.use('/api/workouts', workoutRoutes)
+app.use('/api/questions', questionRoutes)
+app.use('/api/videos', videoRoutes)
+app.use('/api/notifications', notificationRoutes)
+
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() })
 })
 
-// Rota 404
 app.use((req, res) => {
   res.status(404).json({ error: 'Rota não encontrada' })
 })
 
-// Error handling
 app.use((err, req, res, next) => {
-  console.error('Erro:', err)
-  res.status(500).json({ error: 'Erro interno do servidor' })
+  if (err.message === 'Origem não permitida pelo CORS') {
+    return res.status(403).json({ error: 'Origem não permitida' })
+  }
+
+  if (err.type === 'entity.too.large') {
+    return res.status(413).json({ error: 'Conteúdo enviado excede o tamanho permitido' })
+  }
+
+  console.error('Erro não tratado:', err)
+  return res.status(500).json({ error: 'Erro interno do servidor' })
 })
 
-// Iniciar servidor
 const server = app.listen(PORT, () => {
-  console.log(`🚀 Servidor rodando em http://localhost:${PORT}`)
-  console.log(`🌍 Ambiente: ${process.env.NODE_ENV || 'development'}`)
+  console.log(`Servidor iniciado na porta ${PORT}`)
+  console.log(`Ambiente: ${process.env.NODE_ENV || 'development'}`)
 })
 
-// Graceful shutdown
-process.on('SIGTERM', async () => {
-  console.log('📛 Encerrando servidor...')
-  server.close(() => {
-    console.log('✅ Servidor encerrado')
-    process.exit(0)
-  })
-})
-
-process.on('SIGINT', async () => {
-  console.log('📛 Encerrando servidor...')
+async function shutdown(signal) {
+  console.log(`Recebido ${signal}. Encerrando servidor...`)
   await prisma.$disconnect()
-  server.close(() => {
-    console.log('✅ Servidor encerrado')
-    process.exit(0)
-  })
-})
+  server.close(() => process.exit(0))
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'))
+process.on('SIGINT', () => shutdown('SIGINT'))
 
 export default app

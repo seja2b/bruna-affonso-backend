@@ -1,8 +1,9 @@
 import express from 'express'
 import authMiddleware from '../middleware/authMiddleware.js'
+import { requireRole } from '../middleware/roleMiddleware.js'
 import {
-  getDashboard,
   getStudents,
+  getStudentDetails,
   approveStudent,
   rejectStudent,
   deactivateStudent,
@@ -13,38 +14,37 @@ import {
   updateWorkoutAdmin,
   deleteWorkoutAdmin,
   getPendingQuestions,
-  answerQuestion,
   getSettings,
   updateSettings
 } from '../controllers/adminController.js'
+import { getAdminDashboard } from '../controllers/adminDashboardController.js'
+import { getAdminQuestions, answerQuestionWithNotification } from '../controllers/adminQuestionController.js'
 
 const router = express.Router()
 
-// Dashboard
-router.get('/dashboard', authMiddleware, getDashboard)
+router.use(authMiddleware, requireRole('ADMIN'))
 
-// Alunos
-router.get('/students', authMiddleware, getStudents)
-router.put('/students/:studentId/approve', authMiddleware, approveStudent)
-router.put('/students/:studentId/reject', authMiddleware, rejectStudent)
-router.put('/students/:studentId/deactivate', authMiddleware, deactivateStudent)
-router.put('/students/:studentId/reactivate', authMiddleware, reactivateStudent)
+router.get('/dashboard', getAdminDashboard)
 
-// Categorias
-router.get('/categories', authMiddleware, getCategories)
-router.post('/categories', authMiddleware, createCategory)
+router.get('/students', getStudents)
+router.get('/students/:studentId', getStudentDetails)
+router.put('/students/:studentId/approve', approveStudent)
+router.put('/students/:studentId/reject', rejectStudent)
+router.put('/students/:studentId/deactivate', deactivateStudent)
+router.put('/students/:studentId/reactivate', reactivateStudent)
 
-// Treinos
-router.post('/workouts', authMiddleware, createWorkoutAdmin)
-router.put('/workouts/:workoutId', authMiddleware, updateWorkoutAdmin)
-router.delete('/workouts/:workoutId', authMiddleware, deleteWorkoutAdmin)
+router.get('/categories', getCategories)
+router.post('/categories', createCategory)
 
-// Perguntas
-router.get('/questions/pending', authMiddleware, getPendingQuestions)
-router.post('/questions/:questionId/answer', authMiddleware, answerQuestion)
+router.post('/workouts', createWorkoutAdmin)
+router.put('/workouts/:workoutId', updateWorkoutAdmin)
+router.delete('/workouts/:workoutId', deleteWorkoutAdmin)
 
-// Configurações
-router.get('/settings', authMiddleware, getSettings)
-router.put('/settings', authMiddleware, updateSettings)
+router.get('/questions', getAdminQuestions)
+router.get('/questions/pending', getPendingQuestions)
+router.post('/questions/:questionId/answer', answerQuestionWithNotification)
+
+router.get('/settings', getSettings)
+router.put('/settings', updateSettings)
 
 export default router

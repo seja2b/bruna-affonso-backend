@@ -1,18 +1,19 @@
-import jwt from 'jsonwebtoken'
+import { verifyToken } from '../utils/jwt.js'
 
 export default function authMiddleware(req, res, next) {
-  try {
-    const token = req.headers.authorization?.replace('Bearer ', '')
+  const authorization = req.headers.authorization
 
-    if (!token) {
-      return res.status(401).json({ error: 'Token não fornecido' })
-    }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret_key')
-    req.user = decoded
-    next()
-  } catch (error) {
-    console.error('Erro ao verificar token:', error.message)
-    return res.status(401).json({ error: 'Token inválido' })
+  if (!authorization?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Token não fornecido' })
   }
+
+  const token = authorization.slice(7).trim()
+  const decoded = verifyToken(token)
+
+  if (!decoded) {
+    return res.status(401).json({ error: 'Token inválido ou expirado' })
+  }
+
+  req.user = decoded
+  next()
 }
