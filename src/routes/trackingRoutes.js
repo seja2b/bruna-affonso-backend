@@ -1,5 +1,5 @@
 import express from 'express'
-import { authMiddleware, adminOnly, studentOnly } from '../middleware/authMiddleware.js'
+import authMiddleware from '../middleware/authMiddleware.js'
 import {
   getStudentWeeks,
   saveTrackingExercise,
@@ -12,17 +12,18 @@ import {
 
 const router = express.Router()
 
-// ROTAS DO ALUNO (protegidas)
+// Aluno - Semanas e exercícios
 router.get('/student/:studentId/weeks', authMiddleware, getStudentWeeks)
-router.post('/exercise/save', authMiddleware, studentOnly, saveTrackingExercise)
-router.put('/note/student', authMiddleware, studentOnly, saveStudentNote)
-router.put('/profile-photo/:studentId', authMiddleware, studentOnly, updateProfilePhoto)
+router.get('/week/:weekId', authMiddleware, getStudentWeeks)
+router.post('/exercise/save', authMiddleware, saveTrackingExercise)
+router.put('/note/student', authMiddleware, saveStudentNote)
+router.put('/week/:weekId/observation', authMiddleware, saveTeacherNote)
+router.put('/profile-photo/:studentId', authMiddleware, updateProfilePhoto)
 
-// ROTAS DO PROFESSOR (protegidas - ADMIN ONLY)
-router.put('/note/teacher', authMiddleware, adminOnly, saveTeacherNote)
-router.get('/admin/students', authMiddleware, adminOnly, getStudentsTracking)
+// Admin - Tracking geral
+router.get('/students', authMiddleware, getStudentsTracking)
 
-// RANKING (protegido)
+// Ranking
 router.get('/ranking', authMiddleware, getRanking)
 
 export default router
