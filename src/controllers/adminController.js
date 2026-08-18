@@ -1,4 +1,10 @@
 import { PrismaClient } from '@prisma/client'
+import {
+  getProgramFirstMonday,
+  getWeekSchedule,
+  serializeWeekCalendar,
+  syncAutomaticWeekReleases
+} from '../utils/weekSchedule.js'
 
 const prisma = new PrismaClient()
 
@@ -14,23 +20,19 @@ async function ensureStudentWeeks(tx, studentId) {
   const existingWeeks = await tx.weeklyTracking.count({ where: { studentId } })
   if (existingWeeks > 0) return
 
-  const startDate = new Date()
+  const firstMonday = getProgramFirstMonday(new Date())
+
   for (let weekNumber = 1; weekNumber <= 52; weekNumber++) {
-    const startDateForWeek = new Date(startDate)
-    startDateForWeek.setDate(startDate.getDate() + (weekNumber - 1) * 7)
-    const endDateForWeek = new Date(startDateForWeek)
-    endDateForWeek.setDate(startDateForWeek.getDate() + 6)
+    const { startDate, endDate } = getWeekSchedule(firstMonday, weekNumber)
 
     await tx.weeklyTracking.create({
       data: {
         studentId,
         weekNumber,
-        startDate: startDateForWeek,
-        endDate: endDateForWeek,
-        isReleased: weekNumber === 1,
-        exercises: {
-          create: defaultTrackingExercises
-        }
+        startDate,
+        endDate,
+        isReleased: weekNumber === 1 && startDate <= new Date(),
+        exercises: { create: defaultTrackingExercises }
       }
     })
   }
@@ -77,6 +79,15 @@ export async function getStudents(req, res) {
 export async function getStudentDetails(req, res) {
   try {
     const { studentId } = req.params
+    const baseUser = await prisma.user.findFirst({
+      where: { id: studentId, role: 'STUDENT' },
+      select: { student: { select: { id: true } } }
+    })
+
+    if (!baseUser?.student) return res.status(404).json({ error: 'Aluno não encontrado' })
+
+    await syncAutomaticWeekReleases(prisma, baseUser.student.id)
+
     const user = await prisma.user.findFirst({
       where: { id: studentId, role: 'STUDENT' },
       select: {
@@ -108,11 +119,7 @@ export async function getStudentDetails(req, res) {
       }
     })
 
-    if (!user || !user.student) {
-      return res.status(404).json({ error: 'Aluno não encontrado' })
-    }
-
-    const weeks = user.student.weeklyTrackings
+    const weeks = user.student.weeklyTrackings.map(serializeWeekCalendar)
     const completedWeeks = weeks.filter((week) => week.isCompleted).length
     const releasedWeeks = weeks.filter((week) => week.isReleased).length
 
