@@ -15,10 +15,10 @@ import {
   updateWorkoutAdmin,
   deleteWorkoutAdmin,
   getPendingQuestions,
-  answerQuestion,
   getSettings,
   updateSettings
 } from '../controllers/adminController.js'
+import { answerQuestionWithNotification } from '../controllers/adminQuestionController.js'
 
 const router = express.Router()
 
@@ -41,7 +41,7 @@ router.put('/workouts/:workoutId', updateWorkoutAdmin)
 router.delete('/workouts/:workoutId', deleteWorkoutAdmin)
 
 router.get('/questions/pending', getPendingQuestions)
-router.post('/questions/:questionId/answer', answerQuestion)
+router.post('/questions/:questionId/answer', answerQuestionWithNotification)
 
 router.get('/settings', getSettings)
 router.put('/settings', updateSettings)
