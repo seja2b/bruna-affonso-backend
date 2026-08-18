@@ -1,80 +1,35 @@
-const { prisma } = require('../config/database');
+import { PrismaClient } from '@prisma/client'
 
-async function getWorkouts(req, res) {
+const prisma = new PrismaClient()
+
+export async function getWorkouts(req, res) {
   try {
     const workouts = await prisma.workout.findMany({
-      orderBy: { createdAt: 'desc' }
-    });
-    return res.json(workouts);
+      include: { category: true }
+    })
+    return res.json(workouts)
   } catch (error) {
-    return res.status(500).json({ error: 'Erro ao buscar treinos' });
+    console.error('Erro ao buscar treinos:', error)
+    return res.status(500).json({ error: 'Erro ao buscar treinos' })
   }
 }
 
-async function createWorkout(req, res) {
+export async function getWorkoutById(req, res) {
   try {
-    const userId = req.userId;
-    const user = await prisma.user.findUnique({ where: { id: userId } });
+    const { id } = req.params
     
-    if (user?.role !== 'ADMIN') {
-      return res.status(403).json({ error: 'Apenas admin pode criar treinos' });
-    }
-
-    const { title, description, videoUrl, duration, difficulty } = req.body;
-
-    if (!title || !videoUrl) {
-      return res.status(400).json({ error: 'Título e URL do vídeo são obrigatórios' });
-    }
-
-    const workout = await prisma.workout.create({
-      data: { title, description, videoUrl, duration, difficulty }
-    });
-
-    return res.status(201).json(workout);
-  } catch (error) {
-    return res.status(500).json({ error: 'Erro ao criar treino' });
-  }
-}
-
-async function updateWorkout(req, res) {
-  try {
-    const userId = req.userId;
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    
-    if (user?.role !== 'ADMIN') {
-      return res.status(403).json({ error: 'Apenas admin pode editar treinos' });
-    }
-
-    const { id } = req.params;
-    const { title, description, videoUrl, duration, difficulty } = req.body;
-
-    const workout = await prisma.workout.update({
+    const workout = await prisma.workout.findUnique({
       where: { id },
-      data: { title, description, videoUrl, duration, difficulty }
-    });
+      include: { category: true }
+    })
 
-    return res.json(workout);
-  } catch (error) {
-    return res.status(500).json({ error: 'Erro ao atualizar treino' });
-  }
-}
-
-async function deleteWorkout(req, res) {
-  try {
-    const userId = req.userId;
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    
-    if (user?.role !== 'ADMIN') {
-      return res.status(403).json({ error: 'Apenas admin pode deletar treinos' });
+    if (!workout) {
+      return res.status(404).json({ error: 'Treino não encontrado' })
     }
 
-    const { id } = req.params;
-    await prisma.workout.delete({ where: { id } });
-
-    return res.json({ message: 'Treino deletado com sucesso' });
+    return res.json(workout)
   } catch (error) {
-    return res.status(500).json({ error: 'Erro ao deletar treino' });
+    console.error('Erro ao buscar treino:', error)
+    return res.status(500).json({ error: 'Erro ao buscar treino' })
   }
 }
-
-module.exports = { getWorkouts, createWorkout, updateWorkout, deleteWorkout };
