@@ -1,5 +1,6 @@
 import express from 'express'
 import authMiddleware from '../middleware/authMiddleware.js'
+import { requireRole } from '../middleware/roleMiddleware.js'
 import {
   getStudentWeeks,
   saveTrackingExercise,
@@ -12,18 +13,20 @@ import {
 
 const router = express.Router()
 
+router.use(authMiddleware)
+
 // Aluno - Semanas e exercícios
-router.get('/student/:studentId/weeks', authMiddleware, getStudentWeeks)
-router.get('/week/:weekId', authMiddleware, getStudentWeeks)
-router.post('/exercise/save', authMiddleware, saveTrackingExercise)
-router.put('/note/student', authMiddleware, saveStudentNote)
-router.put('/week/:weekId/observation', authMiddleware, saveTeacherNote)
-router.put('/profile-photo/:studentId', authMiddleware, updateProfilePhoto)
+router.get('/student/:studentId/weeks', requireRole('STUDENT'), getStudentWeeks)
+router.get('/week/:weekId', requireRole('STUDENT'), getStudentWeeks)
+router.post('/exercise/save', requireRole('STUDENT'), saveTrackingExercise)
+router.put('/note/student', requireRole('STUDENT'), saveStudentNote)
+router.put('/profile-photo/:studentId', requireRole('STUDENT'), updateProfilePhoto)
 
 // Admin - Tracking geral
-router.get('/students', authMiddleware, getStudentsTracking)
+router.put('/week/:weekId/observation', requireRole('ADMIN'), saveTeacherNote)
+router.get('/students', requireRole('ADMIN'), getStudentsTracking)
 
-// Ranking
-router.get('/ranking', authMiddleware, getRanking)
+// Ranking - disponível para usuários autenticados
+router.get('/ranking', getRanking)
 
 export default router
