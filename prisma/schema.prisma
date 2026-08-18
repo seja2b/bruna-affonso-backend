@@ -123,7 +123,9 @@ model AdminSettings {
   whatsappUrl        String?
   motivationalPhrase String?
   profileImage       String?
-  updatedAt          DateTime  @updatedAt
+  logo               String?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
 }
 
 model WeeklyTracking {
@@ -174,4 +176,14 @@ model StudentRanking {
   weeksCompleted   Int        @default(0)
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
+}
+
+model Video {
+  id              String     @id @default(cuid())
+  title           String
+  description     String?    @db.Text
+  category        String?
+  videoUrl        String
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
 }

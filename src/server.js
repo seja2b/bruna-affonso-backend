@@ -4,6 +4,7 @@ import dotenv from 'dotenv'
 import { PrismaClient } from '@prisma/client'
 import authRoutes from './routes/authRoutes.js'
 import trackingRoutes from './routes/trackingRoutes.js'
+import settingsRoutes from './routes/settingsRoutes.js'
 
 dotenv.config()
 const prisma = new PrismaClient()
@@ -30,6 +31,7 @@ app.use(cors(corsOptions))
 // Rotas
 app.use('/api/auth', authRoutes)
 app.use('/api/tracking', trackingRoutes)
+app.use('/api/admin/settings', settingsRoutes)
 
 // Health check
 app.get('/health', (req, res) => {
