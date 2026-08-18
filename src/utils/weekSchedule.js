@@ -79,14 +79,23 @@ export async function syncAutomaticWeekReleases(prisma, studentId, now = new Dat
   // Ajusta alunos antigos sem apagar exercícios, observações ou conclusão.
   await normalizeStudentWeekSchedule(prisma, studentId)
 
-  await prisma.weeklyTracking.updateMany({
+  const newlyReleased = await prisma.weeklyTracking.findMany({
     where: {
       studentId,
       isReleased: false,
       startDate: { lte: now }
     },
-    data: { isReleased: true }
+    select: { id: true, weekNumber: true, startDate: true, endDate: true }
   })
+
+  if (newlyReleased.length > 0) {
+    await prisma.weeklyTracking.updateMany({
+      where: { id: { in: newlyReleased.map((week) => week.id) } },
+      data: { isReleased: true }
+    })
+  }
+
+  return newlyReleased
 }
 
 export function serializeWeekCalendar(week) {
