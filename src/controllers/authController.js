@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client'
 import { hashPassword, comparePassword } from '../utils/password.js'
-import { generateToken, generateRefreshToken } from '../utils/jwt.js'
+import { generateToken, generateRefreshToken, verifyRefreshToken } from '../utils/jwt.js'
 
 const prisma = new PrismaClient()
 
@@ -24,8 +24,6 @@ export const register = async (req, res) => {
       return res.status(409).json({ error: 'Email já registrado' })
     }
 
-    // Cadastro público nunca concede privilégios administrativos.
-    // Administradores devem ser provisionados por um fluxo controlado.
     const hashedPassword = await hashPassword(password)
 
     const user = await prisma.$transaction(async (tx) => {
@@ -103,6 +101,34 @@ export const login = async (req, res) => {
   } catch (error) {
     console.error('Erro ao fazer login:', error)
     return res.status(500).json({ error: 'Erro ao fazer login' })
+  }
+}
+
+export const refreshSession = async (req, res) => {
+  try {
+    const { refreshToken } = req.body
+    if (!refreshToken) {
+      return res.status(400).json({ error: 'Refresh token não fornecido' })
+    }
+
+    const decoded = verifyRefreshToken(refreshToken)
+    if (!decoded?.userId) {
+      return res.status(401).json({ error: 'Refresh token inválido ou expirado' })
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+      select: { id: true, role: true, status: true }
+    })
+
+    if (!user || user.status === 'INACTIVE' || user.status === 'REJECTED') {
+      return res.status(401).json({ error: 'Sessão não autorizada' })
+    }
+
+    return res.json({ token: generateToken(user.id, user.role) })
+  } catch (error) {
+    console.error('Erro ao renovar sessão:', error)
+    return res.status(500).json({ error: 'Erro ao renovar sessão' })
   }
 }
 
