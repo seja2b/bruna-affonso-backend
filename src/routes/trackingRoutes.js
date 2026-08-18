@@ -6,6 +6,9 @@ import {
   saveTrackingExercise,
   saveStudentNote,
   saveTeacherNote,
+  getAdminStudentWeeks,
+  getAdminWeek,
+  releaseWeekManually,
   getRanking,
   getStudentsTracking,
   updateProfilePhoto
@@ -22,7 +25,10 @@ router.post('/exercise/save', requireRole('STUDENT'), saveTrackingExercise)
 router.put('/note/student', requireRole('STUDENT'), saveStudentNote)
 router.put('/profile-photo/:studentId', requireRole('STUDENT'), updateProfilePhoto)
 
-// Admin - Tracking geral
+// Admin - acompanhamento por aluno e semana
+router.get('/admin/student/:studentId/weeks', requireRole('ADMIN'), getAdminStudentWeeks)
+router.get('/admin/week/:weekId', requireRole('ADMIN'), getAdminWeek)
+router.put('/admin/week/:weekId/release', requireRole('ADMIN'), releaseWeekManually)
 router.put('/week/:weekId/observation', requireRole('ADMIN'), saveTeacherNote)
 router.get('/students', requireRole('ADMIN'), getStudentsTracking)
 
