@@ -8,14 +8,6 @@ import {
 
 const prisma = new PrismaClient()
 
-const defaultTrackingExercises = [
-  { exerciseName: 'Supino Reto', trainingType: 'Força' },
-  { exerciseName: 'Rosca Direta', trainingType: 'Força' },
-  { exerciseName: 'Puxada Alta', trainingType: 'Força' },
-  { exerciseName: 'Agachamento', trainingType: 'Força' },
-  { exerciseName: 'Leg Press', trainingType: 'Força' }
-]
-
 async function ensureStudentWeeks(tx, studentId) {
   const existingWeeks = await tx.weeklyTracking.count({ where: { studentId } })
   if (existingWeeks > 0) return
@@ -31,8 +23,7 @@ async function ensureStudentWeeks(tx, studentId) {
         weekNumber,
         startDate,
         endDate,
-        isReleased: weekNumber === 1 && startDate <= new Date(),
-        exercises: { create: defaultTrackingExercises }
+        isReleased: weekNumber === 1 && startDate <= new Date()
       }
     })
   }
@@ -65,11 +56,16 @@ export async function getStudents(req, res) {
         status: true,
         phone: true,
         profilePhoto: true,
-        createdAt: true
+        createdAt: true,
+        student: { select: { id: true } }
       },
       orderBy: { createdAt: 'desc' }
     })
-    return res.json(students)
+
+    return res.json(students.map(({ student, ...user }) => ({
+      ...user,
+      studentId: student?.id || null
+    })))
   } catch (error) {
     console.error('Erro ao buscar alunos:', error)
     return res.status(500).json({ error: 'Erro ao buscar alunos' })
