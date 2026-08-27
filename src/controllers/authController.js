@@ -107,9 +107,9 @@ export const login = async (req, res) => {
       }
     }
 
-    // Compatibilidade temporária apenas para builds antigos do frontend, que não enviam
-    // o header de sessão. Builds novos nunca recebem o refresh JWT no JavaScript.
-    if (legacyMigrationEnabled() && req.get('X-Requested-With') !== 'XMLHttpRequest') {
+    // Compatibilidade temporária: somente clientes antigos (sem clientVersion 2)
+    // recebem o JWT legado. O frontend novo usa exclusivamente o cookie HttpOnly.
+    if (legacyMigrationEnabled() && Number(req.body?.clientVersion || 1) < 2) {
       payload.refreshToken = generateRefreshToken(user.id)
     }
 
