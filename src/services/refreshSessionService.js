@@ -1,6 +1,7 @@
 import crypto from 'node:crypto'
 
 const DEFAULT_TTL_DAYS = 30
+const ROTATION_GRACE_MS = 5_000
 const COOKIE_NAME = process.env.REFRESH_COOKIE_NAME || 'bruna_refresh'
 
 function getTtlMs() {
@@ -29,6 +30,10 @@ function parseCookies(cookieHeader = '') {
     if (key) cookies[key] = decodeURIComponent(value)
     return cookies
   }, {})
+}
+
+function wasRevokedRecently(revokedAt) {
+  return Boolean(revokedAt && Date.now() - revokedAt.getTime() <= ROTATION_GRACE_MS)
 }
 
 export function hashRefreshToken(token) {
@@ -72,7 +77,14 @@ export function isUserAllowedToAuthenticate(user) {
   return true
 }
 
+export async function pruneExpiredRefreshSessions(db) {
+  await db.refreshSession.deleteMany({
+    where: { expiresAt: { lt: new Date() } }
+  })
+}
+
 export async function issueRefreshSession(db, userId, req, { legacyTokenHash = null } = {}) {
+  await pruneExpiredRefreshSessions(db)
   const rawToken = createOpaqueRefreshToken()
   await db.refreshSession.create({
     data: buildSessionData(userId, req, hashRefreshToken(rawToken), legacyTokenHash)
@@ -92,6 +104,10 @@ export async function rotateRefreshSession(prisma, rawToken, req) {
   if (!existing) return { ok: false, reason: 'invalid' }
 
   if (existing.revokedAt) {
+    if (wasRevokedRecently(existing.revokedAt)) {
+      return { ok: false, reason: 'recent_rotation' }
+    }
+
     await prisma.refreshSession.updateMany({
       where: { userId: existing.userId, revokedAt: null },
       data: { revokedAt: new Date() }
@@ -135,6 +151,15 @@ export async function rotateRefreshSession(prisma, rawToken, req) {
   })
 
   if (!rotated) {
+    const current = await prisma.refreshSession.findUnique({
+      where: { id: existing.id },
+      select: { revokedAt: true, userId: true }
+    })
+
+    if (wasRevokedRecently(current?.revokedAt)) {
+      return { ok: false, reason: 'recent_rotation' }
+    }
+
     await prisma.refreshSession.updateMany({
       where: { userId: existing.userId, revokedAt: null },
       data: { revokedAt: new Date() }
