@@ -1,10 +1,21 @@
 import { PrismaClient } from '@prisma/client'
 import { hashPassword, comparePassword } from '../utils/password.js'
 import { generateToken, generateRefreshToken, verifyRefreshToken } from '../utils/jwt.js'
+import {
+  clearRefreshCookie,
+  getRefreshTokenFromRequest,
+  isUserAllowedToAuthenticate,
+  issueRefreshSession,
+  migrateLegacyRefreshSession,
+  revokeRefreshSession,
+  rotateRefreshSession,
+  setRefreshCookie
+} from '../services/refreshSessionService.js'
 
 const prisma = new PrismaClient()
 
 const normalizeEmail = (email) => email.trim().toLowerCase()
+const legacyMigrationEnabled = () => process.env.LEGACY_REFRESH_MIGRATION_ENABLED !== 'false'
 
 export const register = async (req, res) => {
   try {
@@ -75,20 +86,18 @@ export const login = async (req, res) => {
       return res.status(401).json({ error: 'Email ou senha inválidos' })
     }
 
-    if (user.role === 'STUDENT' && user.status === 'PENDING') {
-      return res.status(403).json({ error: 'Seu cadastro ainda está aguardando aprovação.' })
-    }
-
-    if (user.status === 'INACTIVE' || user.status === 'REJECTED') {
+    if (!isUserAllowedToAuthenticate(user)) {
+      if (user.role === 'STUDENT' && user.status === 'PENDING') {
+        return res.status(403).json({ error: 'Seu cadastro ainda está aguardando aprovação.' })
+      }
       return res.status(403).json({ error: 'Conta sem acesso. Entre em contato com a administração.' })
     }
 
-    const token = generateToken(user.id, user.role)
-    const refreshToken = generateRefreshToken(user.id)
+    const refreshToken = await issueRefreshSession(prisma, user.id, req)
+    setRefreshCookie(res, refreshToken)
 
-    return res.json({
-      token,
-      refreshToken,
+    const payload = {
+      token: generateToken(user.id, user.role),
       user: {
         id: user.id,
         email: user.email,
@@ -96,7 +105,15 @@ export const login = async (req, res) => {
         role: user.role,
         status: user.status
       }
-    })
+    }
+
+    // Compatibilidade temporária: somente clientes antigos (sem clientVersion 2)
+    // recebem o JWT legado. O frontend novo usa exclusivamente o cookie HttpOnly.
+    if (legacyMigrationEnabled() && Number(req.body?.clientVersion || 1) < 2) {
+      payload.refreshToken = generateRefreshToken(user.id)
+    }
+
+    return res.json(payload)
   } catch (error) {
     console.error('Erro ao fazer login:', error)
     return res.status(500).json({ error: 'Erro ao fazer login' })
@@ -105,14 +122,31 @@ export const login = async (req, res) => {
 
 export const refreshSession = async (req, res) => {
   try {
-    const { refreshToken } = req.body
-    if (!refreshToken) {
-      return res.status(400).json({ error: 'Refresh token não fornecido' })
+    const cookieToken = getRefreshTokenFromRequest(req)
+
+    if (cookieToken) {
+      const rotated = await rotateRefreshSession(prisma, cookieToken, req)
+      if (!rotated.ok) {
+        if (rotated.reason === 'recent_rotation') {
+          return res.status(409).json({ error: 'Sessão já está sendo renovada', retry: true })
+        }
+        clearRefreshCookie(res)
+        return res.status(401).json({ error: 'Sessão inválida ou expirada' })
+      }
+
+      setRefreshCookie(res, rotated.rawToken)
+      return res.json({ token: generateToken(rotated.user.id, rotated.user.role) })
     }
 
-    const decoded = verifyRefreshToken(refreshToken)
+    const legacyToken = typeof req.body?.refreshToken === 'string' ? req.body.refreshToken.trim() : ''
+    if (!legacyToken || !legacyMigrationEnabled()) {
+      clearRefreshCookie(res)
+      return res.status(401).json({ error: 'Sessão de renovação ausente' })
+    }
+
+    const decoded = verifyRefreshToken(legacyToken)
     if (!decoded?.userId) {
-      return res.status(401).json({ error: 'Refresh token inválido ou expirado' })
+      return res.status(401).json({ error: 'Refresh token legado inválido ou expirado' })
     }
 
     const user = await prisma.user.findUnique({
@@ -120,12 +154,20 @@ export const refreshSession = async (req, res) => {
       select: { id: true, role: true, status: true }
     })
 
-    const studentPending = user?.role === 'STUDENT' && user.status === 'PENDING'
-    if (!user || studentPending || user.status === 'INACTIVE' || user.status === 'REJECTED') {
+    if (!isUserAllowedToAuthenticate(user)) {
       return res.status(401).json({ error: 'Sessão não autorizada' })
     }
 
-    return res.json({ token: generateToken(user.id, user.role) })
+    const migrated = await migrateLegacyRefreshSession(prisma, legacyToken, user.id, req)
+    if (!migrated.ok) {
+      if (migrated.reason === 'already_migrated') {
+        return res.status(409).json({ error: 'Sessão legada já está sendo migrada', retry: true })
+      }
+      return res.status(401).json({ error: 'Refresh token legado inválido' })
+    }
+
+    setRefreshCookie(res, migrated.rawToken)
+    return res.json({ token: generateToken(user.id, user.role), migrated: true })
   } catch (error) {
     console.error('Erro ao renovar sessão:', error)
     return res.status(500).json({ error: 'Erro ao renovar sessão' })
@@ -133,7 +175,16 @@ export const refreshSession = async (req, res) => {
 }
 
 export const logout = async (req, res) => {
-  return res.json({ message: 'Logout realizado com sucesso' })
+  try {
+    const cookieToken = getRefreshTokenFromRequest(req)
+    await revokeRefreshSession(prisma, cookieToken)
+    clearRefreshCookie(res)
+    return res.json({ message: 'Logout realizado com sucesso' })
+  } catch (error) {
+    console.error('Erro ao encerrar sessão:', error)
+    clearRefreshCookie(res)
+    return res.json({ message: 'Logout realizado com sucesso' })
+  }
 }
 
 export const getMe = async (req, res) => {

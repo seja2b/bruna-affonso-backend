@@ -37,10 +37,20 @@ jobs:
       - name: Validate Prisma schema
         run: npx prisma validate
 
-      - name: Check server imports
-        run: node --check src/server.js
-
-      - name: Validate production start command
+      - name: Check security-critical imports
         run: |
-          grep -qx 'web: node src/server.js' Procfile.txt
+          node --check src/server.js
+          node --check src/controllers/authController.js
+          node --check src/services/refreshSessionService.js
+
+      - name: Validate refresh session SQL
+        run: |
+          test -f prisma/sql/ensure_refresh_sessions.sql
+          grep -q 'CREATE TABLE IF NOT EXISTS "RefreshSession"' prisma/sql/ensure_refresh_sessions.sql
+          grep -q 'CREATE UNIQUE INDEX IF NOT EXISTS "RefreshSession_tokenHash_key"' prisma/sql/ensure_refresh_sessions.sql
+
+      - name: Validate production start commands
+        run: |
+          grep -qx 'web: npx prisma db execute --file prisma/sql/ensure_refresh_sessions.sql --schema prisma/schema.prisma && node src/server.js' Procfile.txt
+          node -e "const p=require('./package.json'); if(!p.scripts.start.includes('prisma db execute --file prisma/sql/ensure_refresh_sessions.sql')) process.exit(1)"
           test -f src/server.js

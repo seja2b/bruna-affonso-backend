@@ -9,13 +9,22 @@ const loginLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 15, scop
 const registerLimiter = createRateLimiter({ windowMs: 60 * 60 * 1000, max: 8, scope: 'register' })
 const refreshLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 60, scope: 'refresh' })
 
+function requireAjaxSessionRequest(req, res, next) {
+  if (req.get('X-Requested-With') === 'XMLHttpRequest') return next()
+
+  const isLegacyRefreshMigration = req.path === '/refresh' && typeof req.body?.refreshToken === 'string' && req.body.refreshToken.trim()
+  if (isLegacyRefreshMigration && process.env.LEGACY_REFRESH_MIGRATION_ENABLED !== 'false') return next()
+
+  return res.status(403).json({ error: 'Requisição de sessão inválida' })
+}
+
 // Públicas
 router.post('/login', loginLimiter, login)
 router.post('/register', registerLimiter, register)
-router.post('/refresh', refreshLimiter, refreshSession)
+router.post('/refresh', refreshLimiter, requireAjaxSessionRequest, refreshSession)
+router.post('/logout', requireAjaxSessionRequest, logout)
 
 // Protegidas
-router.post('/logout', authMiddleware, logout)
 router.get('/me', authMiddleware, getMe)
 router.put('/me', authMiddleware, updateMe)
 
