@@ -1,6 +1,7 @@
 import express from 'express'
 import authMiddleware from '../middleware/authMiddleware.js'
 import { requireRole } from '../middleware/roleMiddleware.js'
+import rankingPrivacyMiddleware from '../middleware/rankingPrivacyMiddleware.js'
 import {
   getStudentWeeks,
   saveTrackingExercise,
@@ -34,7 +35,7 @@ router.put('/admin/week/:weekId/release', requireRole('ADMIN'), releaseWeekManua
 router.put('/week/:weekId/observation', requireRole('ADMIN'), saveTeacherNote)
 router.get('/students', requireRole('ADMIN'), getStudentsTracking)
 
-// Ranking - disponível para usuários autenticados
-router.get('/ranking', getRanking)
+// Ranking - disponível para usuários autenticados, com dados pessoais minimizados
+router.get('/ranking', rankingPrivacyMiddleware, getRanking)
 
 export default router
