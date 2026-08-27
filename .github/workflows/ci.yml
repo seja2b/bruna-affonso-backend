@@ -37,10 +37,19 @@ jobs:
       - name: Validate Prisma schema
         run: npx prisma validate
 
-      - name: Check server imports
-        run: node --check src/server.js
+      - name: Check security-critical imports
+        run: |
+          node --check src/server.js
+          node --check src/controllers/authController.js
+          node --check src/services/refreshSessionService.js
+
+      - name: Validate refresh migration files
+        run: |
+          test -f prisma/migrations/migration_lock.toml
+          test -f prisma/migrations/20260827130000_refresh_sessions/migration.sql
+          grep -q 'CREATE TABLE "RefreshSession"' prisma/migrations/20260827130000_refresh_sessions/migration.sql
 
       - name: Validate production start command
         run: |
-          grep -qx 'web: node src/server.js' Procfile.txt
+          grep -qx 'web: npx prisma migrate deploy && node src/server.js' Procfile.txt
           test -f src/server.js
