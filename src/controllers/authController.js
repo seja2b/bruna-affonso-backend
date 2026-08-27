@@ -127,6 +127,9 @@ export const refreshSession = async (req, res) => {
     if (cookieToken) {
       const rotated = await rotateRefreshSession(prisma, cookieToken, req)
       if (!rotated.ok) {
+        if (rotated.reason === 'recent_rotation') {
+          return res.status(409).json({ error: 'Sessão já está sendo renovada', retry: true })
+        }
         clearRefreshCookie(res)
         return res.status(401).json({ error: 'Sessão inválida ou expirada' })
       }
@@ -157,7 +160,10 @@ export const refreshSession = async (req, res) => {
 
     const migrated = await migrateLegacyRefreshSession(prisma, legacyToken, user.id, req)
     if (!migrated.ok) {
-      return res.status(401).json({ error: 'Refresh token legado já migrado' })
+      if (migrated.reason === 'already_migrated') {
+        return res.status(409).json({ error: 'Sessão legada já está sendo migrada', retry: true })
+      }
+      return res.status(401).json({ error: 'Refresh token legado inválido' })
     }
 
     setRefreshCookie(res, migrated.rawToken)
