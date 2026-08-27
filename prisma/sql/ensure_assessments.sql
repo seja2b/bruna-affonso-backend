@@ -20,6 +20,9 @@ CREATE INDEX IF NOT EXISTS "AssessmentCycle_studentId_createdAt_idx" ON "Assessm
 CREATE UNIQUE INDEX IF NOT EXISTS "AssessmentPhoto_storageKey_key" ON "AssessmentPhoto"("storageKey");
 CREATE UNIQUE INDEX IF NOT EXISTS "AssessmentPhoto_cycleId_view_key" ON "AssessmentPhoto"("cycleId", "view");
 CREATE UNIQUE INDEX IF NOT EXISTS "AssessmentVideo_stage_key" ON "AssessmentVideo"("stage");
+ALTER TABLE "Notification" ADD COLUMN IF NOT EXISTS "key" TEXT;
+ALTER TABLE "Notification" ADD COLUMN IF NOT EXISTS "actionUrl" TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS "Notification_key_key" ON "Notification"("key");
 DO $$ BEGIN
   ALTER TABLE "AssessmentCycle" ADD CONSTRAINT "AssessmentCycle_studentId_fkey" FOREIGN KEY ("studentId") REFERENCES "Student"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
