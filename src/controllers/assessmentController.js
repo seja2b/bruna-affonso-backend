@@ -50,6 +50,12 @@ export async function getMyAssessments(req, res) {
     return res.json({ cycles: cycles.map(serialize), videos })
   } catch (error) { console.error('Erro ao buscar avaliações:', error); return res.status(500).json({ error: 'Erro ao buscar avaliações' }) }
 }
+export async function markAssessmentIntroductionSeen(req, res) {
+  const student = await studentForUser(req.user.userId)
+  if (!student) return res.status(404).json({ error: 'Perfil de aluna não encontrado' })
+  const updated = await prisma.student.update({ where: { id: student.id }, data: { assessmentIntroSeenAt: new Date() }, select: { assessmentIntroSeenAt: true } })
+  return res.json(updated)
+}
 export async function saveStage(req, res) {
   try {
     const stage = String(req.params.stage || '').toUpperCase()

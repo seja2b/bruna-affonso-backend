@@ -44,3 +44,4 @@ CREATE UNIQUE INDEX "AssessmentPhoto_cycleId_view_key" ON "AssessmentPhoto"("cyc
 CREATE UNIQUE INDEX "AssessmentVideo_stage_key" ON "AssessmentVideo"("stage");
 ALTER TABLE "AssessmentCycle" ADD CONSTRAINT "AssessmentCycle_studentId_fkey" FOREIGN KEY ("studentId") REFERENCES "Student"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "AssessmentPhoto" ADD CONSTRAINT "AssessmentPhoto_cycleId_fkey" FOREIGN KEY ("cycleId") REFERENCES "AssessmentCycle"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "Student" ADD COLUMN "assessmentIntroSeenAt" TIMESTAMP(3);

@@ -23,6 +23,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS "AssessmentVideo_stage_key" ON "AssessmentVide
 DO $$ BEGIN
   ALTER TABLE "AssessmentCycle" ADD CONSTRAINT "AssessmentCycle_studentId_fkey" FOREIGN KEY ("studentId") REFERENCES "Student"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+ALTER TABLE "Student" ADD COLUMN IF NOT EXISTS "assessmentIntroSeenAt" TIMESTAMP(3);
 DO $$ BEGIN
   ALTER TABLE "AssessmentPhoto" ADD CONSTRAINT "AssessmentPhoto_cycleId_fkey" FOREIGN KEY ("cycleId") REFERENCES "AssessmentCycle"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;

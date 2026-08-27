@@ -51,6 +51,7 @@ model Student {
   weeklyTrackings   WeeklyTracking[]
   ranking           StudentRanking?
   assessmentCycles  AssessmentCycle[]
+  assessmentIntroSeenAt DateTime?
   createdAt         DateTime   @default(now())
   updatedAt         DateTime   @updatedAt
 }
