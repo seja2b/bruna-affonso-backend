@@ -41,13 +41,8 @@ export const register = async (req, res) => {
       return createdUser
     })
 
-    const token = generateToken(user.id, user.role)
-    const refreshToken = generateRefreshToken(user.id)
-
     return res.status(201).json({
-      message: 'Usuário criado e aguardando aprovação',
-      token,
-      refreshToken,
+      message: 'Cadastro recebido. Aguarde a aprovação da administração antes de entrar na plataforma.',
       user: {
         id: user.id,
         email: user.email,
@@ -78,6 +73,10 @@ export const login = async (req, res) => {
     const passwordValid = await comparePassword(password, user.password)
     if (!passwordValid) {
       return res.status(401).json({ error: 'Email ou senha inválidos' })
+    }
+
+    if (user.role === 'STUDENT' && user.status === 'PENDING') {
+      return res.status(403).json({ error: 'Seu cadastro ainda está aguardando aprovação.' })
     }
 
     if (user.status === 'INACTIVE' || user.status === 'REJECTED') {
@@ -121,7 +120,8 @@ export const refreshSession = async (req, res) => {
       select: { id: true, role: true, status: true }
     })
 
-    if (!user || user.status === 'INACTIVE' || user.status === 'REJECTED') {
+    const studentPending = user?.role === 'STUDENT' && user.status === 'PENDING'
+    if (!user || studentPending || user.status === 'INACTIVE' || user.status === 'REJECTED') {
       return res.status(401).json({ error: 'Sessão não autorizada' })
     }
 

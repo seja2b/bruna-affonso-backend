@@ -15,17 +15,29 @@ function getRefreshSecret() {
   return getRequiredSecret('REFRESH_SECRET', 'JWT_REFRESH_SECRET')
 }
 
+const ACCESS_TOKEN_TTL = process.env.JWT_ACCESS_TTL || '30m'
+const REFRESH_TOKEN_TTL = process.env.JWT_REFRESH_TTL || '30d'
+const JWT_OPTIONS = { algorithm: 'HS256' }
+
 export function generateToken(userId, role) {
-  return jwt.sign({ userId, role }, getRequiredSecret('JWT_SECRET'), { expiresIn: '7d' })
+  return jwt.sign(
+    { userId, role },
+    getRequiredSecret('JWT_SECRET'),
+    { ...JWT_OPTIONS, expiresIn: ACCESS_TOKEN_TTL }
+  )
 }
 
 export function generateRefreshToken(userId) {
-  return jwt.sign({ userId }, getRefreshSecret(), { expiresIn: '30d' })
+  return jwt.sign(
+    { userId },
+    getRefreshSecret(),
+    { ...JWT_OPTIONS, expiresIn: REFRESH_TOKEN_TTL }
+  )
 }
 
 export function verifyToken(token) {
   try {
-    return jwt.verify(token, getRequiredSecret('JWT_SECRET'))
+    return jwt.verify(token, getRequiredSecret('JWT_SECRET'), { algorithms: ['HS256'] })
   } catch (error) {
     return null
   }
@@ -33,7 +45,7 @@ export function verifyToken(token) {
 
 export function verifyRefreshToken(token) {
   try {
-    return jwt.verify(token, getRefreshSecret())
+    return jwt.verify(token, getRefreshSecret(), { algorithms: ['HS256'] })
   } catch (error) {
     return null
   }

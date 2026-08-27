@@ -11,6 +11,7 @@ import questionRoutes from './routes/questionRoutes.js'
 import videoRoutes from './routes/videoRoutes.js'
 import notificationRoutes from './routes/notificationRoutes.js'
 import authMiddleware from './middleware/authMiddleware.js'
+import securityHeadersMiddleware from './middleware/securityHeadersMiddleware.js'
 
 dotenv.config()
 
@@ -18,6 +19,14 @@ const app = express()
 const prisma = new PrismaClient()
 const PORT = process.env.PORT || 3000
 const isProduction = process.env.NODE_ENV === 'production'
+
+// Railway e outros PaaS ficam atrás de proxy reverso. Confiar apenas no número
+// configurado de saltos permite que req.ip seja usado sem aceitar x-forwarded-for
+// arbitrário enviado diretamente pelo cliente.
+if (isProduction) {
+  const configuredHops = Number.parseInt(process.env.TRUST_PROXY_HOPS || '1', 10)
+  app.set('trust proxy', Number.isFinite(configuredHops) && configuredHops >= 0 ? configuredHops : 1)
+}
 
 function parseAllowedOrigins() {
   const configured = (process.env.CORS_ORIGINS || '')
@@ -57,6 +66,7 @@ const corsOptions = {
 const requestBodyLimit = process.env.REQUEST_BODY_LIMIT || '6mb'
 
 app.disable('x-powered-by')
+app.use(securityHeadersMiddleware)
 app.use(cors(corsOptions))
 app.use(express.json({ limit: requestBodyLimit }))
 app.use(express.urlencoded({ limit: requestBodyLimit, extended: true }))
@@ -76,6 +86,7 @@ app.use('/api/videos', videoRoutes)
 app.use('/api/notifications', notificationRoutes)
 
 app.get('/health', (req, res) => {
+  res.set('Cache-Control', 'no-store')
   res.json({ status: 'OK', timestamp: new Date().toISOString() })
 })
 
@@ -100,6 +111,11 @@ const server = app.listen(PORT, () => {
   console.log(`Servidor iniciado na porta ${PORT}`)
   console.log(`Ambiente: ${process.env.NODE_ENV || 'development'}`)
 })
+
+// Reduz a janela para conexões lentas/maliciosas sem alterar o fluxo normal da API.
+server.requestTimeout = Number(process.env.REQUEST_TIMEOUT_MS || 30_000)
+server.headersTimeout = Number(process.env.HEADERS_TIMEOUT_MS || 35_000)
+server.keepAliveTimeout = Number(process.env.KEEP_ALIVE_TIMEOUT_MS || 5_000)
 
 async function shutdown(signal) {
   console.log(`Recebido ${signal}. Encerrando servidor...`)
