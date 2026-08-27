@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client'
 import { hashPassword, comparePassword } from '../utils/password.js'
-import { generateToken, verifyRefreshToken } from '../utils/jwt.js'
+import { generateToken, generateRefreshToken, verifyRefreshToken } from '../utils/jwt.js'
 import {
   clearRefreshCookie,
   getRefreshTokenFromRequest,
@@ -96,7 +96,7 @@ export const login = async (req, res) => {
     const refreshToken = await issueRefreshSession(prisma, user.id, req)
     setRefreshCookie(res, refreshToken)
 
-    return res.json({
+    const payload = {
       token: generateToken(user.id, user.role),
       user: {
         id: user.id,
@@ -105,7 +105,15 @@ export const login = async (req, res) => {
         role: user.role,
         status: user.status
       }
-    })
+    }
+
+    // Compatibilidade temporária apenas para builds antigos do frontend, que não enviam
+    // o header de sessão. Builds novos nunca recebem o refresh JWT no JavaScript.
+    if (legacyMigrationEnabled() && req.get('X-Requested-With') !== 'XMLHttpRequest') {
+      payload.refreshToken = generateRefreshToken(user.id)
+    }
+
+    return res.json(payload)
   } catch (error) {
     console.error('Erro ao fazer login:', error)
     return res.status(500).json({ error: 'Erro ao fazer login' })
