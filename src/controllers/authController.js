@@ -96,6 +96,7 @@ export const login = async (req, res) => {
     const refreshToken = await issueRefreshSession(prisma, user.id, req)
     setRefreshCookie(res, refreshToken)
 
+    const loginStudent = user.role === 'STUDENT' ? await prisma.student.findUnique({ where: { userId: user.id }, select: { id: true, assessmentIntroSeenAt: true } }) : null
     const payload = {
       token: generateToken(user.id, user.role),
       user: {
@@ -103,7 +104,9 @@ export const login = async (req, res) => {
         email: user.email,
         name: user.name,
         role: user.role,
-        status: user.status
+        status: user.status,
+        studentId: loginStudent?.id || null,
+        assessmentIntroSeenAt: loginStudent?.assessmentIntroSeenAt || null
       }
     }
 
@@ -210,8 +213,9 @@ export const getMe = async (req, res) => {
 
     let studentId = null
     if (user.role === 'STUDENT') {
-      const student = await prisma.student.findUnique({ where: { userId: user.id } })
+      const student = await prisma.student.findUnique({ where: { userId: user.id }, select: { id: true, assessmentIntroSeenAt: true } })
       studentId = student?.id || null
+      user.assessmentIntroSeenAt = student?.assessmentIntroSeenAt || null
     }
 
     return res.json({ ...user, studentId })

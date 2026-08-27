@@ -10,3 +10,4 @@ build/
 pids/
 *.pid
 logs/
+private_uploads/
