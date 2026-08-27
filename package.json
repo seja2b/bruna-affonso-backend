@@ -5,7 +5,7 @@
   "description": "API Bruna Affonso",
   "main": "src/server.js",
   "scripts": {
-    "start": "prisma migrate deploy && node src/server.js",
+    "start": "prisma db execute --file prisma/sql/ensure_refresh_sessions.sql --schema prisma/schema.prisma && node src/server.js",
     "dev": "node --watch src/server.js"
   },
   "keywords": [],
