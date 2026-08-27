@@ -5,7 +5,7 @@
   "description": "API Bruna Affonso",
   "main": "src/server.js",
   "scripts": {
-    "start": "prisma db execute --file prisma/sql/ensure_refresh_sessions.sql --schema prisma/schema.prisma && node src/server.js",
+    "start": "prisma db execute --file prisma/sql/ensure_refresh_sessions.sql --schema prisma/schema.prisma && prisma db execute --file prisma/sql/ensure_assessments.sql --schema prisma/schema.prisma && node src/server.js",
     "dev": "node --watch src/server.js"
   },
   "keywords": [],
@@ -17,7 +17,8 @@
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
-    "jsonwebtoken": "^9.0.2"
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^2.2.0"
   },
   "devDependencies": {
     "prisma": "^5.8.0"

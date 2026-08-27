@@ -20,6 +20,7 @@ import {
 } from '../controllers/adminController.js'
 import { getAdminDashboard } from '../controllers/adminDashboardController.js'
 import { getAdminQuestions, answerQuestionWithNotification } from '../controllers/adminQuestionController.js'
+import { getAdminAssessments, getVideos, releaseReassessment, updateVideos } from '../controllers/assessmentController.js'
 
 const router = express.Router()
 
@@ -33,6 +34,10 @@ router.put('/students/:studentId/approve', approveStudent)
 router.put('/students/:studentId/reject', rejectStudent)
 router.put('/students/:studentId/deactivate', deactivateStudent)
 router.put('/students/:studentId/reactivate', reactivateStudent)
+router.get('/students/:studentId/assessments', getAdminAssessments)
+router.post('/students/:studentId/reassessments', releaseReassessment)
+router.get('/assessment-videos', getVideos)
+router.put('/assessment-videos', updateVideos)
 
 router.get('/categories', getCategories)
 router.post('/categories', createCategory)

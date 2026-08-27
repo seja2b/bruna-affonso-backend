@@ -164,7 +164,18 @@ export async function approveStudent(req, res) {
       })
 
       const student = await tx.student.findUnique({ where: { userId: studentId } })
-      if (student) await ensureStudentWeeks(tx, student.id)
+      if (student) {
+        await ensureStudentWeeks(tx, student.id)
+        await tx.assessmentCycle.upsert({
+          where: { studentId_sequence: { studentId: student.id, sequence: 0 } },
+          update: {},
+          create: {
+            studentId: student.id,
+            deadlineAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+            stageStatuses: { ANAMNESIS: 'PENDING', BODY: 'PENDING', POSTURAL: 'PENDING', STRENGTH: 'PENDING', ENDURANCE: 'PENDING' }
+          }
+        })
+      }
 
       return updatedUser
     })

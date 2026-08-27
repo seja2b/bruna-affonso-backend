@@ -10,6 +10,7 @@ import workoutRoutes from './routes/workoutRoutes.js'
 import questionRoutes from './routes/questionRoutes.js'
 import videoRoutes from './routes/videoRoutes.js'
 import notificationRoutes from './routes/notificationRoutes.js'
+import assessmentRoutes from './routes/assessmentRoutes.js'
 import authMiddleware from './middleware/authMiddleware.js'
 import securityHeadersMiddleware from './middleware/securityHeadersMiddleware.js'
 
@@ -84,6 +85,7 @@ app.use('/api/workouts', workoutRoutes)
 app.use('/api/questions', questionRoutes)
 app.use('/api/videos', videoRoutes)
 app.use('/api/notifications', notificationRoutes)
+app.use('/api/assessments', assessmentRoutes)
 
 app.get('/health', (req, res) => {
   res.set('Cache-Control', 'no-store')
