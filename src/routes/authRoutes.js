@@ -10,10 +10,12 @@ const registerLimiter = createRateLimiter({ windowMs: 60 * 60 * 1000, max: 8, sc
 const refreshLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 60, scope: 'refresh' })
 
 function requireAjaxSessionRequest(req, res, next) {
-  if (req.get('X-Requested-With') !== 'XMLHttpRequest') {
-    return res.status(403).json({ error: 'Requisição de sessão inválida' })
-  }
-  next()
+  if (req.get('X-Requested-With') === 'XMLHttpRequest') return next()
+
+  const isLegacyRefreshMigration = req.path === '/refresh' && typeof req.body?.refreshToken === 'string' && req.body.refreshToken.trim()
+  if (isLegacyRefreshMigration && process.env.LEGACY_REFRESH_MIGRATION_ENABLED !== 'false') return next()
+
+  return res.status(403).json({ error: 'Requisição de sessão inválida' })
 }
 
 // Públicas
