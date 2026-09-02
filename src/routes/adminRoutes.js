@@ -16,7 +16,11 @@ import {
   deleteWorkoutAdmin,
   getPendingQuestions,
   getSettings,
-  updateSettings
+  updateSettings,
+  getAdministrators,
+  getAdministratorCandidates,
+  promoteAdministrator,
+  removeAdministrator
 } from '../controllers/adminController.js'
 import { getAdminDashboard } from '../controllers/adminDashboardController.js'
 import { getAdminQuestions, answerQuestionWithNotification } from '../controllers/adminQuestionController.js'
@@ -27,6 +31,11 @@ const router = express.Router()
 router.use(authMiddleware, requireRole('ADMIN'), sanitizeAdminResponseMiddleware)
 
 router.get('/dashboard', getAdminDashboard)
+
+router.get('/administrators', getAdministrators)
+router.get('/administrators/candidates', getAdministratorCandidates)
+router.put('/administrators/:userId/promote', promoteAdministrator)
+router.put('/administrators/:userId/remove', removeAdministrator)
 
 router.get('/students', getStudents)
 router.get('/students/:studentId', getStudentDetails)

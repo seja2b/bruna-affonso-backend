@@ -347,3 +347,119 @@ export async function updateSettings(req, res) {
     return res.status(500).json({ error: 'Erro ao atualizar configurações' })
   }
 }
+
+const administratorSelect = {
+  id: true,
+  name: true,
+  email: true,
+  status: true,
+  profilePhoto: true,
+  createdAt: true,
+  updatedAt: true
+}
+
+export async function getAdministrators(req, res) {
+  try {
+    const administrators = await prisma.user.findMany({
+      where: { role: 'ADMIN' },
+      select: administratorSelect,
+      orderBy: [{ name: 'asc' }, { email: 'asc' }]
+    })
+
+    return res.json({ administrators, currentUserId: req.user.userId })
+  } catch (error) {
+    console.error('Erro ao buscar administradores:', error)
+    return res.status(500).json({ error: 'Erro ao buscar administradores' })
+  }
+}
+
+export async function getAdministratorCandidates(req, res) {
+  try {
+    const query = typeof req.query.q === 'string' ? req.query.q.trim() : ''
+    const candidates = await prisma.user.findMany({
+      where: {
+        role: 'STUDENT',
+        ...(query ? {
+          OR: [
+            { name: { contains: query, mode: 'insensitive' } },
+            { email: { contains: query, mode: 'insensitive' } }
+          ]
+        } : {})
+      },
+      select: administratorSelect,
+      orderBy: [{ name: 'asc' }, { email: 'asc' }],
+      take: 30
+    })
+
+    return res.json(candidates)
+  } catch (error) {
+    console.error('Erro ao buscar candidatos a administrador:', error)
+    return res.status(500).json({ error: 'Erro ao buscar contas elegíveis' })
+  }
+}
+
+export async function promoteAdministrator(req, res) {
+  try {
+    const { userId } = req.params
+    const promoted = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.findUnique({ where: { id: userId }, select: { id: true, role: true } })
+      if (!user) return { status: 404, error: 'Conta não encontrada' }
+      if (user.role === 'ADMIN') return { status: 409, error: 'Esta conta já é administradora' }
+      if (user.role !== 'STUDENT') return { status: 400, error: 'Apenas contas de alunas podem ser promovidas' }
+
+      await tx.admin.upsert({
+        where: { userId },
+        update: {},
+        create: { userId }
+      })
+      const administrator = await tx.user.update({
+        where: { id: userId },
+        data: { role: 'ADMIN', status: 'APPROVED' },
+        select: administratorSelect
+      })
+      return { administrator }
+    })
+
+    if (promoted.error) return res.status(promoted.status).json({ error: promoted.error })
+    return res.json({ message: 'Acesso administrativo concedido com sucesso', administrator: promoted.administrator })
+  } catch (error) {
+    console.error('Erro ao promover administrador:', error)
+    return res.status(500).json({ error: 'Erro ao conceder acesso administrativo' })
+  }
+}
+
+export async function removeAdministrator(req, res) {
+  try {
+    const { userId } = req.params
+    if (userId === req.user.userId) {
+      return res.status(400).json({ error: 'Peça para outro administrador remover o seu acesso' })
+    }
+
+    const removed = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.findUnique({ where: { id: userId }, select: { id: true, role: true } })
+      if (!user || user.role !== 'ADMIN') return { status: 404, error: 'Administrador não encontrado' }
+
+      const administratorCount = await tx.user.count({ where: { role: 'ADMIN' } })
+      if (administratorCount <= 1) return { status: 409, error: 'O último administrador não pode ser removido' }
+
+      await tx.student.upsert({
+        where: { userId },
+        update: {},
+        create: { userId }
+      })
+      await tx.admin.deleteMany({ where: { userId } })
+      const student = await tx.user.update({
+        where: { id: userId },
+        data: { role: 'STUDENT', status: 'APPROVED' },
+        select: administratorSelect
+      })
+      return { student }
+    }, { isolationLevel: 'Serializable' })
+
+    if (removed.error) return res.status(removed.status).json({ error: removed.error })
+    return res.json({ message: 'Acesso administrativo removido com sucesso', user: removed.student })
+  } catch (error) {
+    console.error('Erro ao remover administrador:', error)
+    return res.status(500).json({ error: 'Erro ao remover acesso administrativo' })
+  }
+}
