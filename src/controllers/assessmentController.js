@@ -36,11 +36,12 @@ function sanitizeAnamnesis(input = {}) {
 }
 function sanitizeBody(input = {}) { return Object.fromEntries(['weightKg', 'heightCm', 'waistCm', 'hipCm', 'rightArmCm', 'leftArmCm', 'rightThighCm', 'leftThighCm'].map((key) => [key, finite(input[key], 0, 500)])) }
 function sanitizeStrength(input = {}) {
-  return Object.fromEntries(EXERCISES.map((key) => { const loadKg = finite(input[key]?.loadKg, 0, 1000); const repetitions = finite(input[key]?.repetitions, 1, 100); return [key, { loadKg, repetitions, estimatedOneRm: loadKg !== null && repetitions !== null ? Number((loadKg * (1 + repetitions / 30)).toFixed(2)) : null }] }))
+  const exercises = Object.fromEntries(EXERCISES.map((key) => { const loadKg = finite(input[key]?.loadKg, 0, 1000); const repetitions = finite(input[key]?.repetitions, 1, 100); return [key, { loadKg, repetitions, estimatedOneRm: loadKg !== null && repetitions !== null ? Number((loadKg * (1 + repetitions / 30)).toFixed(2)) : null }] }))
+  return { ...exercises, pushUps: finite(input.pushUps, 0, 10000), plankSeconds: finite(input.plankSeconds, 0, 86400), abdominalReps: finite(input.abdominalReps, 0, 10000) }
 }
 function sanitizeEndurance(input = {}) {
   const distanceMeters = finite(input.distanceMeters, 0, 100000)
-  return { modality: ['BIKE', 'TREADMILL'].includes(input.modality) ? input.modality : null, distanceMeters, vamKmh: distanceMeters === null ? null : Number((distanceMeters / 83.33).toFixed(2)), pushUps: finite(input.pushUps, 0, 10000), plankSeconds: finite(input.plankSeconds, 0, 86400), abdominalReps: finite(input.abdominalReps, 0, 10000) }
+  return { modality: ['BIKE', 'TREADMILL'].includes(input.modality) ? input.modality : null, distanceMeters, vamKmh: distanceMeters === null ? null : Number((distanceMeters / 83.33).toFixed(2)) }
 }
 export async function getMyAssessments(req, res) {
   try {
