@@ -190,6 +190,7 @@ model TrackingExercise {
   id                 String     @id @default(cuid())
   weeklyTrackingId   String
   weeklyTracking     WeeklyTracking @relation(fields: [weeklyTrackingId], references: [id], onDelete: Cascade)
+  dayOfWeek          String     @default("MONDAY")
   exerciseName       String
   trainingType       String
   weight             String?

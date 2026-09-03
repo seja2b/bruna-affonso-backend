@@ -67,15 +67,17 @@ async function syncReleasesAndNotify(student) {
 }
 
 function normalizeExercises(exercises) {
+  const allowedDays = new Set(['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'])
   return exercises
     .map((exercise) => ({
+      dayOfWeek: allowedDays.has(exercise.dayOfWeek) ? exercise.dayOfWeek : 'MONDAY',
       exerciseName: String(exercise.exerciseName || '').trim(),
       trainingType: String(exercise.trainingType || '').trim(),
       weight: String(exercise.weight || '').trim(),
       reps: String(exercise.reps || '').trim(),
       notes: String(exercise.notes || '').trim()
     }))
-    .filter((exercise) => Object.values(exercise).some(Boolean))
+    .filter((exercise) => [exercise.exerciseName, exercise.trainingType, exercise.weight, exercise.reps, exercise.notes].some(Boolean))
 }
 
 function isExerciseComplete(exercise) {
@@ -126,7 +128,9 @@ export async function saveTrackingExercise(req, res) {
     if (week.isCompleted) return res.status(409).json({ error: 'Esta semana já foi concluída' })
 
     const normalized = normalizeExercises(exercises)
-    if (normalized.length > 30) return res.status(400).json({ error: 'Limite de 30 exercícios por semana' })
+    if (normalized.length > 75) return res.status(400).json({ error: 'Limite de 15 exercícios por dia' })
+    const overDailyLimit = [...new Set(normalized.map((exercise) => exercise.dayOfWeek))].some((day) => normalized.filter((exercise) => exercise.dayOfWeek === day).length > 15)
+    if (overDailyLimit) return res.status(400).json({ error: 'Limite de 15 exercícios por dia' })
 
     await prisma.$transaction(async (tx) => {
       await tx.trackingExercise.deleteMany({ where: { weeklyTrackingId: weekId } })
