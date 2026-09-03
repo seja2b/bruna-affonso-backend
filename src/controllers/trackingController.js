@@ -325,10 +325,37 @@ export async function resetStudentProgram(req, res) {
   try {
     const student = await prisma.student.findUnique({ where: { id: req.params.studentId } })
     if (!student) return res.status(404).json({ error: 'Aluna não encontrada' })
-    await prisma.$transaction([prisma.weeklyTracking.deleteMany({ where: { studentId: student.id } }), prisma.programWorkout.deleteMany({ where: { studentId: student.id } }), prisma.studentRanking.upsert({ where: { studentId: student.id }, create: { studentId: student.id }, update: { totalPoints: 0, weeksCompleted: 0 } })])
-    await ensureStudentWeeks(student.id)
-    return res.json({ message: 'Treinos e semanas reiniciados para a renovação' })
+    await prisma.$transaction(async (tx) => {
+      const awarded = await tx.programWorkout.count({ where: { studentId: student.id, pointsAwarded: true } })
+      const ranking = await tx.studentRanking.findUnique({ where: { studentId: student.id } })
+      await tx.weeklyTracking.deleteMany({ where: { studentId: student.id } })
+      await tx.programWorkout.deleteMany({ where: { studentId: student.id } })
+      await tx.studentRanking.upsert({ where: { studentId: student.id }, create: { studentId: student.id }, update: { totalPoints: Math.max(0, (ranking?.totalPoints || 0) - awarded * 100), weeksCompleted: 0 } })
+    })
+    return res.json({ message: 'Todos os treinos e semanas foram excluídos' })
   } catch (error) { console.error('Error resetStudentProgram:', error); return res.status(500).json({ error: 'Erro ao reiniciar programa' }) }
+}
+
+export async function clearStudentWeeks(req, res) {
+  try {
+    const student = await prisma.student.findUnique({ where: { id: req.params.studentId } })
+    if (!student) return res.status(404).json({ error: 'Aluna não encontrada' })
+    await prisma.$transaction(async (tx) => {
+      const weeks = await tx.weeklyTracking.findMany({ where: { studentId: student.id }, select: { id: true } })
+      const weekIds = weeks.map((week) => week.id)
+      const awarded = await tx.programWorkout.count({ where: { studentId: student.id, pointsAwarded: true } })
+      const ranking = await tx.studentRanking.findUnique({ where: { studentId: student.id } })
+      if (weekIds.length) {
+        await tx.trackingExercise.deleteMany({ where: { weeklyTrackingId: { in: weekIds } } })
+        await tx.weeklyObservation.deleteMany({ where: { weeklyTrackingId: { in: weekIds } } })
+      }
+      await tx.weeklyTracking.updateMany({ where: { studentId: student.id }, data: { isCompleted: false, completedAt: null, isReleased: false } })
+      await tx.weeklyTracking.updateMany({ where: { studentId: student.id, weekNumber: 1 }, data: { isReleased: true } })
+      await tx.programWorkout.updateMany({ where: { studentId: student.id }, data: { pointsAwarded: false } })
+      await tx.studentRanking.upsert({ where: { studentId: student.id }, create: { studentId: student.id }, update: { totalPoints: Math.max(0, (ranking?.totalPoints || 0) - awarded * 100), weeksCompleted: 0 } })
+    })
+    return res.json({ message: 'Conteúdos e conclusões apagados; a estrutura das semanas foi mantida' })
+  } catch (error) { console.error('Error clearStudentWeeks:', error); return res.status(500).json({ error: 'Erro ao zerar semanas' }) }
 }
 
 export async function updateStudentPackage(req, res) {

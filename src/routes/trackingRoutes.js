@@ -17,6 +17,7 @@ import {
   createProgramWorkout,
   updateAdminWeekDates,
   resetStudentProgram,
+  clearStudentWeeks,
   updateStudentPackage
 } from '../controllers/trackingController.js'
 
@@ -39,6 +40,7 @@ router.put('/admin/week/:weekId/release', requireRole('ADMIN'), releaseWeekManua
 router.put('/admin/week/:weekId/dates', requireRole('ADMIN'), updateAdminWeekDates)
 router.post('/admin/student/:studentId/workouts', requireRole('ADMIN'), createProgramWorkout)
 router.delete('/admin/student/:studentId/program', requireRole('ADMIN'), resetStudentProgram)
+router.post('/admin/student/:studentId/weeks/clear', requireRole('ADMIN'), clearStudentWeeks)
 router.put('/admin/student/:studentId/package', requireRole('ADMIN'), updateStudentPackage)
 router.put('/week/:weekId/observation', requireRole('ADMIN'), saveTeacherNote)
 router.get('/students', requireRole('ADMIN'), getStudentsTracking)
