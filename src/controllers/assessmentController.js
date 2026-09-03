@@ -41,7 +41,7 @@ function sanitizeStrength(input = {}) {
 }
 function sanitizeEndurance(input = {}) {
   const distanceMeters = finite(input.distanceMeters, 0, 100000)
-  return { modality: ['BIKE', 'TREADMILL'].includes(input.modality) ? input.modality : null, distanceMeters, vamKmh: distanceMeters === null ? null : Number((distanceMeters / 83.33).toFixed(2)) }
+  return { modality: 'TREADMILL', distanceMeters, vamKmh: distanceMeters === null ? null : Number((distanceMeters / 83.33).toFixed(2)) }
 }
 export async function getMyAssessments(req, res) {
   try {
