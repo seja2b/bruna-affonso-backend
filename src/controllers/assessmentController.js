@@ -5,7 +5,7 @@ import { milestonePoints } from '../utils/programPoints.js'
 
 const prisma = new PrismaClient()
 const STAGES = ['ANAMNESIS', 'BODY', 'POSTURAL', 'STRENGTH', 'ENDURANCE']
-const PHOTO_VIEWS = ['FRONT', 'BACK', 'RIGHT', 'LEFT', 'FRONT_RELAXED', 'BACK_RELAXED', 'RIGHT_RELAXED', 'LEFT_RELAXED', 'FRONT_DETAIL', 'BACK_DETAIL', 'RIGHT_DETAIL', 'LEFT_DETAIL', 'FRONT_FOURTH', 'BACK_FOURTH', 'RIGHT_FOURTH', 'LEFT_FOURTH', 'FRONT_FIFTH', 'BACK_FIFTH', 'RIGHT_FIFTH', 'LEFT_FIFTH']
+const PHOTO_VIEWS = ['FRONT', 'BACK', 'RIGHT', 'LEFT', 'FRONT_RELAXED', 'BACK_RELAXED', 'RIGHT_RELAXED', 'LEFT_RELAXED', 'FRONT_DETAIL', 'BACK_DETAIL', 'RIGHT_DETAIL', 'LEFT_DETAIL', 'FRONT_FOURTH', 'BACK_FOURTH', 'RIGHT_FOURTH', 'LEFT_FOURTH', 'FRONT_FIFTH', 'BACK_FIFTH', 'RIGHT_FIFTH', 'LEFT_FIFTH', 'POSTERIOR_RIGHT', 'POSTERIOR_LEFT', 'DEEP_SQUAT']
 const EXERCISES = ['smithSquat', 'closeGripPulldown', 'seatedDumbbellPress', 'deadlift']
 const blankStatuses = () => Object.fromEntries(STAGES.map((stage) => [stage, 'PENDING']))
 const deadline = () => new Date(Date.now() + 7 * 86400000)
@@ -100,7 +100,7 @@ export async function uploadPhoto(req, res) {
     const photo = await prisma.assessmentPhoto.upsert({ where: { cycleId_view: { cycleId: cycle.id, view } }, update: { storageKey: req.file.filename, originalName: req.file.originalname, mimeType: req.file.mimetype, size: req.file.size }, create: { cycleId: cycle.id, view, storageKey: req.file.filename, originalName: req.file.originalname, mimeType: req.file.mimetype, size: req.file.size } })
     if (existing && existing.storageKey !== req.file.filename) fs.promises.unlink(path.join(req.file.destination, existing.storageKey)).catch(() => {})
     const count = await prisma.assessmentPhoto.count({ where: { cycleId: cycle.id } })
-    await prisma.assessmentCycle.update({ where: { id: cycle.id }, data: { stageStatuses: { ...blankStatuses(), ...(cycle.stageStatuses || {}), POSTURAL: count >= 20 ? 'COMPLETED' : 'IN_PROGRESS' } } })
+    await prisma.assessmentCycle.update({ where: { id: cycle.id }, data: { stageStatuses: { ...blankStatuses(), ...(cycle.stageStatuses || {}), POSTURAL: count >= 23 ? 'COMPLETED' : 'IN_PROGRESS' } } })
     return res.status(201).json({ id: photo.id, view: photo.view, url: `/assessments/photos/${photo.id}` })
   } catch (error) { if (req.file) fs.promises.unlink(req.file.path).catch(() => {}); console.error('Erro ao enviar foto:', error); return res.status(500).json({ error: 'Erro ao enviar foto' }) }
 }
