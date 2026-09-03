@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { PrismaClient } from '@prisma/client'
+import { milestonePoints } from '../utils/programPoints.js'
 
 const prisma = new PrismaClient()
 const STAGES = ['ANAMNESIS', 'BODY', 'POSTURAL', 'STRENGTH', 'ENDURANCE']
@@ -76,8 +77,10 @@ export async function saveStage(req, res) {
     const updated = await prisma.$transaction(async (tx) => {
       let saved = await tx.assessmentCycle.update({ where: { id: cycle.id }, data, include: { photos: true } })
       if (finished && cycle.sequence > 0 && !cycle.pointsAwarded) {
+        const student = await tx.student.findUnique({ where: { id: cycle.studentId }, select: { packageType: true } })
+        const points = milestonePoints(student?.packageType)
         const award = await tx.assessmentCycle.updateMany({ where: { id: cycle.id, pointsAwarded: false }, data: { pointsAwarded: true } })
-        if (award.count) await tx.studentRanking.upsert({ where: { studentId: cycle.studentId }, create: { studentId: cycle.studentId, totalPoints: 100 }, update: { totalPoints: { increment: 100 } } })
+        if (award.count) await tx.studentRanking.upsert({ where: { studentId: cycle.studentId }, create: { studentId: cycle.studentId, totalPoints: points }, update: { totalPoints: { increment: points } } })
         saved = await tx.assessmentCycle.findUnique({ where: { id: cycle.id }, include: { photos: true } })
       }
       return saved
@@ -123,6 +126,8 @@ export async function releaseReassessment(req, res) {
   const latest = await prisma.assessmentCycle.findFirst({ where: { studentId: student.id }, orderBy: { sequence: 'desc' } })
   if (latest && latest.status !== 'COMPLETED') return res.status(409).json({ error: 'Conclua o ciclo atual antes de liberar outro' })
   const sequence = (latest?.sequence || 0) + 1
+  const limit = student.packageType === 'SEMIANNUAL' ? 4 : 2
+  if (sequence > limit) return res.status(409).json({ error: `O plano permite no máximo ${limit} reavaliações neste ciclo` })
   return res.status(201).json(serialize(await prisma.assessmentCycle.create({ data: { studentId: student.id, type: 'REASSESSMENT', sequence, deadlineAt: deadline(), stageStatuses: blankStatuses() }, include: { photos: true } })))
 }
 export async function getVideos(req, res) { return res.json(await prisma.assessmentVideo.findMany({ orderBy: { stage: 'asc' } })) }

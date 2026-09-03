@@ -6,11 +6,12 @@ import {
   syncAutomaticWeekReleases
 } from '../utils/weekSchedule.js'
 import { createNotification, createNotifications } from '../services/notificationService.js'
+import { milestonePoints } from '../utils/programPoints.js'
 
 const prisma = new PrismaClient()
 
 async function getAuthenticatedStudent(userId) {
-  return prisma.student.findUnique({ where: { userId }, select: { id: true, userId: true } })
+  return prisma.student.findUnique({ where: { userId }, select: { id: true, userId: true, packageType: true } })
 }
 
 async function getAccessibleWeek(studentId, weekId) {
@@ -105,7 +106,7 @@ export async function getStudentWeeks(req, res) {
       orderBy: [{ trainingNumber: 'asc' }, { weekNumber: 'asc' }]
     })
 
-    return res.json(weeks.map(serializeWeekCalendar))
+    return res.json(weeks.map((week) => ({ ...serializeWeekCalendar(week), packageType: student.packageType })))
   } catch (error) {
     console.error('Error getStudentWeeks:', error)
     return res.status(500).json({ error: 'Erro ao buscar semanas' })
@@ -186,18 +187,19 @@ export async function completeWeek(req, res) {
       let awardedPoints = 0
       let ranking = await tx.studentRanking.upsert({ where: { studentId: student.id }, create: { studentId: student.id, weeksCompleted: 1 }, update: { weeksCompleted: { increment: 1 } } })
       if (completedWeeks === 6) {
+        const points = milestonePoints(student.packageType)
         const program = await tx.programWorkout.upsert({ where: { studentId_trainingNumber: { studentId: student.id, trainingNumber: week.trainingNumber } }, update: {}, create: { studentId: student.id, trainingNumber: week.trainingNumber, title: `Treino ${String(week.trainingNumber).padStart(2, '0')}` } })
         const award = await tx.programWorkout.updateMany({ where: { id: program.id, pointsAwarded: false }, data: { pointsAwarded: true } })
         if (award.count) {
-          awardedPoints = 100
-          ranking = await tx.studentRanking.update({ where: { studentId: student.id }, data: { totalPoints: { increment: 100 } } })
+          awardedPoints = points
+          ranking = await tx.studentRanking.update({ where: { studentId: student.id }, data: { totalPoints: { increment: points } } })
         }
       }
 
       await createNotification(tx, {
         userId: student.userId,
         title: `Semana ${week.weekNumber} concluída`,
-        message: awardedPoints ? `Parabéns! Você concluiu as 6 semanas do Treino ${String(week.trainingNumber).padStart(2, '0')} e recebeu 100 pontos.` : 'Semana concluída. Continue até completar as 6 semanas deste treino.',
+        message: awardedPoints ? `Parabéns! Você concluiu as 6 semanas do Treino ${String(week.trainingNumber).padStart(2, '0')} e recebeu ${awardedPoints} pontos.` : 'Semana concluída. Continue até completar as 6 semanas deste treino.',
         type: 'WEEK_COMPLETED'
       })
 
@@ -334,7 +336,7 @@ export async function resetStudentProgram(req, res) {
       const ranking = await tx.studentRanking.findUnique({ where: { studentId: student.id } })
       await tx.weeklyTracking.deleteMany({ where: { studentId: student.id } })
       await tx.programWorkout.deleteMany({ where: { studentId: student.id } })
-      await tx.studentRanking.upsert({ where: { studentId: student.id }, create: { studentId: student.id }, update: { totalPoints: Math.max(0, (ranking?.totalPoints || 0) - awarded * 100), weeksCompleted: 0 } })
+      await tx.studentRanking.upsert({ where: { studentId: student.id }, create: { studentId: student.id }, update: { totalPoints: Math.max(0, (ranking?.totalPoints || 0) - awarded * milestonePoints(student.packageType)), weeksCompleted: 0 } })
     })
     return res.json({ message: 'Todos os treinos e semanas foram excluídos' })
   } catch (error) { console.error('Error resetStudentProgram:', error); return res.status(500).json({ error: 'Erro ao reiniciar programa' }) }
@@ -356,7 +358,7 @@ export async function clearStudentWeeks(req, res) {
       await tx.weeklyTracking.updateMany({ where: { studentId: student.id }, data: { isCompleted: false, completedAt: null, isReleased: false } })
       await tx.weeklyTracking.updateMany({ where: { studentId: student.id, weekNumber: 1 }, data: { isReleased: true } })
       await tx.programWorkout.updateMany({ where: { studentId: student.id }, data: { pointsAwarded: false } })
-      await tx.studentRanking.upsert({ where: { studentId: student.id }, create: { studentId: student.id }, update: { totalPoints: Math.max(0, (ranking?.totalPoints || 0) - awarded * 100), weeksCompleted: 0 } })
+      await tx.studentRanking.upsert({ where: { studentId: student.id }, create: { studentId: student.id }, update: { totalPoints: Math.max(0, (ranking?.totalPoints || 0) - awarded * milestonePoints(student.packageType)), weeksCompleted: 0 } })
     })
     return res.json({ message: 'Conteúdos e conclusões apagados; a estrutura das semanas foi mantida' })
   } catch (error) { console.error('Error clearStudentWeeks:', error); return res.status(500).json({ error: 'Erro ao zerar semanas' }) }
@@ -365,7 +367,19 @@ export async function clearStudentWeeks(req, res) {
 export async function updateStudentPackage(req, res) {
   const packageType = String(req.body?.packageType || '').toUpperCase()
   if (!['QUARTERLY', 'SEMIANNUAL'].includes(packageType)) return res.status(400).json({ error: 'Plano inválido' })
-  try { return res.json(await prisma.student.update({ where: { id: req.params.studentId }, data: { packageType } })) } catch { return res.status(404).json({ error: 'Aluna não encontrada' }) }
+  try {
+    const student = await prisma.$transaction(async (tx) => {
+      const updated = await tx.student.update({ where: { id: req.params.studentId }, data: { packageType } })
+      const [workouts, reassessments] = await Promise.all([
+        tx.programWorkout.count({ where: { studentId: updated.id, pointsAwarded: true } }),
+        tx.assessmentCycle.count({ where: { studentId: updated.id, sequence: { gt: 0 }, pointsAwarded: true } })
+      ])
+      const recalculatedPoints = Math.min(400, (workouts + reassessments) * milestonePoints(packageType))
+      await tx.studentRanking.upsert({ where: { studentId: updated.id }, create: { studentId: updated.id, totalPoints: recalculatedPoints }, update: { totalPoints: recalculatedPoints } })
+      return updated
+    })
+    return res.json(student)
+  } catch { return res.status(404).json({ error: 'Aluna não encontrada' }) }
 }
 
 export async function getAdminWeek(req, res) {
