@@ -9,17 +9,24 @@ import {
 const prisma = new PrismaClient()
 
 async function ensureStudentWeeks(tx, studentId) {
-  const existingWeeks = await tx.weeklyTracking.count({ where: { studentId } })
-  if (existingWeeks > 0) return
+  const existingWeeks = await tx.weeklyTracking.count({ where: { studentId, trainingNumber: 1, weekNumber: { lte: 6 } } })
+  if (existingWeeks >= 6) {
+    const programWorkout = await tx.programWorkout.upsert({ where: { studentId_trainingNumber: { studentId, trainingNumber: 1 } }, update: {}, create: { studentId, trainingNumber: 1, title: 'Treino 01' } })
+    await tx.weeklyTracking.updateMany({ where: { studentId, trainingNumber: 1, weekNumber: { lte: 6 }, programWorkoutId: null }, data: { programWorkoutId: programWorkout.id } })
+    return
+  }
 
   const firstMonday = getProgramFirstMonday(new Date())
+  const programWorkout = await tx.programWorkout.upsert({ where: { studentId_trainingNumber: { studentId, trainingNumber: 1 } }, update: {}, create: { studentId, trainingNumber: 1, title: 'Treino 01' } })
 
-  for (let weekNumber = 1; weekNumber <= 52; weekNumber++) {
+  for (let weekNumber = existingWeeks + 1; weekNumber <= 6; weekNumber++) {
     const { startDate, endDate } = getWeekSchedule(firstMonday, weekNumber)
 
     await tx.weeklyTracking.create({
       data: {
         studentId,
+        programWorkoutId: programWorkout.id,
+        trainingNumber: 1,
         weekNumber,
         startDate,
         endDate,

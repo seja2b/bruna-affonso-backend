@@ -51,6 +51,8 @@ model Student {
   weeklyTrackings   WeeklyTracking[]
   ranking           StudentRanking?
   assessmentCycles  AssessmentCycle[]
+  programWorkouts   ProgramWorkout[]
+  packageType       String     @default("QUARTERLY")
   assessmentIntroSeenAt DateTime?
   createdAt         DateTime   @default(now())
   updatedAt         DateTime   @updatedAt
@@ -153,6 +155,9 @@ model WeeklyTracking {
   studentId     String
   student       Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
   weekNumber    Int
+  trainingNumber Int        @default(1)
+  programWorkoutId String?
+  programWorkout ProgramWorkout? @relation(fields: [programWorkoutId], references: [id], onDelete: Cascade)
   startDate     DateTime
   endDate       DateTime
   isReleased    Boolean    @default(false)
@@ -162,7 +167,23 @@ model WeeklyTracking {
   observation   WeeklyObservation?
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
-  @@unique([studentId, weekNumber])
+  @@unique([studentId, trainingNumber, weekNumber])
+  @@index([programWorkoutId])
+}
+
+model ProgramWorkout {
+  id             String           @id @default(cuid())
+  studentId      String
+  student        Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  trainingNumber Int
+  title          String
+  pointsAwarded  Boolean          @default(false)
+  weeks          WeeklyTracking[]
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@unique([studentId, trainingNumber])
+  @@index([studentId])
 }
 
 model TrackingExercise {
@@ -208,6 +229,18 @@ model Video {
   updatedAt       DateTime   @updatedAt
 }
 
+model Ebook {
+  id           String   @id @default(cuid())
+  title        String
+  description  String?  @db.Text
+  storageKey   String   @unique
+  originalName String
+  mimeType     String
+  size         Int
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
 model AssessmentCycle {
   id              String              @id @default(cuid())
   studentId       String
@@ -224,6 +257,7 @@ model AssessmentCycle {
   strengthTest    Json?
   enduranceTest   Json?
   healthConsentAt DateTime?
+  pointsAwarded   Boolean             @default(false)
   photos           AssessmentPhoto[]
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt

@@ -21,16 +21,26 @@ async function getAccessibleWeek(studentId, weekId) {
 }
 
 async function ensureStudentWeeks(studentId) {
-  const count = await prisma.weeklyTracking.count({ where: { studentId } })
-  if (count > 0) return
-
+  const count = await prisma.weeklyTracking.count({ where: { studentId, trainingNumber: 1, weekNumber: { lte: 6 } } })
+  if (count >= 6) {
+    const programWorkout = await prisma.programWorkout.upsert({ where: { studentId_trainingNumber: { studentId, trainingNumber: 1 } }, update: {}, create: { studentId, trainingNumber: 1, title: 'Treino 01' } })
+    await prisma.weeklyTracking.updateMany({ where: { studentId, trainingNumber: 1, weekNumber: { lte: 6 }, programWorkoutId: null }, data: { programWorkoutId: programWorkout.id } })
+    return
+  }
   const firstMonday = getProgramFirstMonday(new Date())
   await prisma.$transaction(async (tx) => {
-    for (let weekNumber = 1; weekNumber <= 52; weekNumber++) {
+    const programWorkout = await tx.programWorkout.upsert({
+      where: { studentId_trainingNumber: { studentId, trainingNumber: 1 } },
+      update: {},
+      create: { studentId, trainingNumber: 1, title: 'Treino 01' }
+    })
+    for (let weekNumber = count + 1; weekNumber <= 6; weekNumber++) {
       const { startDate, endDate } = getWeekSchedule(firstMonday, weekNumber)
       await tx.weeklyTracking.create({
         data: {
           studentId,
+          programWorkoutId: programWorkout.id,
+          trainingNumber: 1,
           weekNumber,
           startDate,
           endDate,
@@ -88,9 +98,9 @@ export async function getStudentWeeks(req, res) {
     }
 
     const weeks = await prisma.weeklyTracking.findMany({
-      where: { studentId: student.id },
+      where: { studentId: student.id, weekNumber: { lte: 6 } },
       include: { exercises: true, observation: true },
-      orderBy: { weekNumber: 'asc' }
+      orderBy: [{ trainingNumber: 'asc' }, { weekNumber: 'asc' }]
     })
 
     return res.json(weeks.map(serializeWeekCalendar))
@@ -168,20 +178,26 @@ export async function completeWeek(req, res) {
         return { awardedPoints: 0, ranking: await tx.studentRanking.findUnique({ where: { studentId: student.id } }) }
       }
 
-      const ranking = await tx.studentRanking.upsert({
-        where: { studentId: student.id },
-        create: { studentId: student.id, totalPoints: 100, weeksCompleted: 1 },
-        update: { totalPoints: { increment: 100 }, weeksCompleted: { increment: 1 } }
-      })
+      const completedWeeks = await tx.weeklyTracking.count({ where: { studentId: student.id, trainingNumber: week.trainingNumber, weekNumber: { lte: 6 }, isCompleted: true } })
+      let awardedPoints = 0
+      let ranking = await tx.studentRanking.upsert({ where: { studentId: student.id }, create: { studentId: student.id, weeksCompleted: 1 }, update: { weeksCompleted: { increment: 1 } } })
+      if (completedWeeks === 6) {
+        const program = await tx.programWorkout.upsert({ where: { studentId_trainingNumber: { studentId: student.id, trainingNumber: week.trainingNumber } }, update: {}, create: { studentId: student.id, trainingNumber: week.trainingNumber, title: `Treino ${String(week.trainingNumber).padStart(2, '0')}` } })
+        const award = await tx.programWorkout.updateMany({ where: { id: program.id, pointsAwarded: false }, data: { pointsAwarded: true } })
+        if (award.count) {
+          awardedPoints = 100
+          ranking = await tx.studentRanking.update({ where: { studentId: student.id }, data: { totalPoints: { increment: 100 } } })
+        }
+      }
 
       await createNotification(tx, {
         userId: student.userId,
         title: `Semana ${week.weekNumber} concluída`,
-        message: `Parabéns! Você concluiu a semana e recebeu 100 pontos. Total atual: ${ranking.totalPoints} pontos.`,
+        message: awardedPoints ? `Parabéns! Você concluiu as 6 semanas do Treino ${String(week.trainingNumber).padStart(2, '0')} e recebeu 100 pontos.` : 'Semana concluída. Continue até completar as 6 semanas deste treino.',
         type: 'WEEK_COMPLETED'
       })
 
-      return { awardedPoints: 100, ranking }
+      return { awardedPoints, ranking }
     })
 
     return res.json({ message: 'Semana concluída com sucesso', ...result })
@@ -264,9 +280,9 @@ export async function getAdminStudentWeeks(req, res) {
     await syncReleasesAndNotify(student)
 
     const weeks = await prisma.weeklyTracking.findMany({
-      where: { studentId: student.id },
+      where: { studentId: student.id, weekNumber: { lte: 6 } },
       include: { exercises: true, observation: true },
-      orderBy: { weekNumber: 'asc' }
+      orderBy: [{ trainingNumber: 'asc' }, { weekNumber: 'asc' }]
     })
 
     return res.json(weeks.map(serializeWeekCalendar))
@@ -274,6 +290,51 @@ export async function getAdminStudentWeeks(req, res) {
     console.error('Error getAdminStudentWeeks:', error)
     return res.status(500).json({ error: 'Erro ao buscar semanas do aluno' })
   }
+}
+
+export async function createProgramWorkout(req, res) {
+  try {
+    const student = await prisma.student.findUnique({ where: { id: req.params.studentId }, include: { programWorkouts: true } })
+    if (!student) return res.status(404).json({ error: 'Aluna não encontrada' })
+    const limit = student.packageType === 'SEMIANNUAL' ? 4 : 2
+    const trainingNumber = (student.programWorkouts.reduce((max, item) => Math.max(max, item.trainingNumber), 0) || 0) + 1
+    if (trainingNumber > limit) return res.status(409).json({ error: `O plano permite no máximo ${limit} treinos` })
+    const firstMonday = getProgramFirstMonday(req.body?.startDate ? new Date(req.body.startDate) : new Date())
+    const workout = await prisma.$transaction(async (tx) => {
+      const created = await tx.programWorkout.create({ data: { studentId: student.id, trainingNumber, title: `Treino ${String(trainingNumber).padStart(2, '0')}` } })
+      for (let weekNumber = 1; weekNumber <= 6; weekNumber++) {
+        const { startDate, endDate } = getWeekSchedule(firstMonday, weekNumber)
+        await tx.weeklyTracking.create({ data: { studentId: student.id, programWorkoutId: created.id, trainingNumber, weekNumber, startDate, endDate, isReleased: weekNumber === 1 } })
+      }
+      return created
+    })
+    return res.status(201).json({ message: `${workout.title} criado com 6 semanas`, workout })
+  } catch (error) { console.error('Error createProgramWorkout:', error); return res.status(500).json({ error: 'Erro ao criar treino' }) }
+}
+
+export async function updateAdminWeekDates(req, res) {
+  try {
+    const startDate = new Date(req.body?.startDate); const endDate = new Date(req.body?.endDate)
+    if (!Number.isFinite(startDate.getTime()) || !Number.isFinite(endDate.getTime()) || endDate < startDate) return res.status(400).json({ error: 'Informe datas válidas' })
+    const week = await prisma.weeklyTracking.update({ where: { id: req.params.weekId }, data: { startDate, endDate }, include: { exercises: true, observation: true } })
+    return res.json({ message: 'Datas atualizadas', week: serializeWeekCalendar(week) })
+  } catch (error) { console.error('Error updateAdminWeekDates:', error); return res.status(500).json({ error: 'Erro ao atualizar datas' }) }
+}
+
+export async function resetStudentProgram(req, res) {
+  try {
+    const student = await prisma.student.findUnique({ where: { id: req.params.studentId } })
+    if (!student) return res.status(404).json({ error: 'Aluna não encontrada' })
+    await prisma.$transaction([prisma.weeklyTracking.deleteMany({ where: { studentId: student.id } }), prisma.programWorkout.deleteMany({ where: { studentId: student.id } }), prisma.studentRanking.upsert({ where: { studentId: student.id }, create: { studentId: student.id }, update: { totalPoints: 0, weeksCompleted: 0 } })])
+    await ensureStudentWeeks(student.id)
+    return res.json({ message: 'Treinos e semanas reiniciados para a renovação' })
+  } catch (error) { console.error('Error resetStudentProgram:', error); return res.status(500).json({ error: 'Erro ao reiniciar programa' }) }
+}
+
+export async function updateStudentPackage(req, res) {
+  const packageType = String(req.body?.packageType || '').toUpperCase()
+  if (!['QUARTERLY', 'SEMIANNUAL'].includes(packageType)) return res.status(400).json({ error: 'Plano inválido' })
+  try { return res.json(await prisma.student.update({ where: { id: req.params.studentId }, data: { packageType } })) } catch { return res.status(404).json({ error: 'Aluna não encontrada' }) }
 }
 
 export async function getAdminWeek(req, res) {
@@ -355,6 +416,7 @@ export async function getStudentsTracking(req, res) {
 
     return res.json(students.filter((student) => student.user.status === 'APPROVED').map((student) => ({
       id: student.id,
+      packageType: student.packageType,
       userId: student.user.id,
       name: student.user.name,
       email: student.user.email,

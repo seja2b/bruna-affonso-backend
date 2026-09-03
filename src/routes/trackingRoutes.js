@@ -13,7 +13,11 @@ import {
   releaseWeekManually,
   getRanking,
   getStudentsTracking,
-  updateProfilePhoto
+  updateProfilePhoto,
+  createProgramWorkout,
+  updateAdminWeekDates,
+  resetStudentProgram,
+  updateStudentPackage
 } from '../controllers/trackingController.js'
 
 const router = express.Router()
@@ -32,6 +36,10 @@ router.put('/profile-photo/:studentId', requireRole('STUDENT'), updateProfilePho
 router.get('/admin/student/:studentId/weeks', requireRole('ADMIN'), getAdminStudentWeeks)
 router.get('/admin/week/:weekId', requireRole('ADMIN'), getAdminWeek)
 router.put('/admin/week/:weekId/release', requireRole('ADMIN'), releaseWeekManually)
+router.put('/admin/week/:weekId/dates', requireRole('ADMIN'), updateAdminWeekDates)
+router.post('/admin/student/:studentId/workouts', requireRole('ADMIN'), createProgramWorkout)
+router.delete('/admin/student/:studentId/program', requireRole('ADMIN'), resetStudentProgram)
+router.put('/admin/student/:studentId/package', requireRole('ADMIN'), updateStudentPackage)
 router.put('/week/:weekId/observation', requireRole('ADMIN'), saveTeacherNote)
 router.get('/students', requireRole('ADMIN'), getStudentsTracking)
 

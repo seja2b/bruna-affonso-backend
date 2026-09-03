@@ -4,7 +4,7 @@ import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 const STAGES = ['ANAMNESIS', 'BODY', 'POSTURAL', 'STRENGTH', 'ENDURANCE']
-const PHOTO_VIEWS = ['FRONT', 'BACK', 'RIGHT', 'LEFT']
+const PHOTO_VIEWS = ['FRONT', 'BACK', 'RIGHT', 'LEFT', 'FRONT_RELAXED', 'BACK_RELAXED', 'RIGHT_RELAXED', 'LEFT_RELAXED', 'FRONT_DETAIL', 'BACK_DETAIL', 'RIGHT_DETAIL', 'LEFT_DETAIL']
 const EXERCISES = ['smithSquat', 'closeGripPulldown', 'seatedDumbbellPress', 'deadlift']
 const blankStatuses = () => Object.fromEntries(STAGES.map((stage) => [stage, 'PENDING']))
 const deadline = () => new Date(Date.now() + 7 * 86400000)
@@ -70,8 +70,18 @@ export async function saveStage(req, res) {
     if (stage === 'BODY') data.bodyAssessment = sanitizeBody(req.body.data)
     if (stage === 'STRENGTH') data.strengthTest = sanitizeStrength(req.body.data)
     if (stage === 'ENDURANCE') data.enduranceTest = sanitizeEndurance(req.body.data)
-    if (STAGES.every((item) => statuses[item] === 'COMPLETED')) Object.assign(data, { status: 'COMPLETED', completedAt: new Date() })
-    return res.json(serialize(await prisma.assessmentCycle.update({ where: { id: cycle.id }, data, include: { photos: true } })))
+    const finished = STAGES.every((item) => statuses[item] === 'COMPLETED')
+    if (finished) Object.assign(data, { status: 'COMPLETED', completedAt: new Date() })
+    const updated = await prisma.$transaction(async (tx) => {
+      let saved = await tx.assessmentCycle.update({ where: { id: cycle.id }, data, include: { photos: true } })
+      if (finished && cycle.sequence > 0 && !cycle.pointsAwarded) {
+        const award = await tx.assessmentCycle.updateMany({ where: { id: cycle.id, pointsAwarded: false }, data: { pointsAwarded: true } })
+        if (award.count) await tx.studentRanking.upsert({ where: { studentId: cycle.studentId }, create: { studentId: cycle.studentId, totalPoints: 100 }, update: { totalPoints: { increment: 100 } } })
+        saved = await tx.assessmentCycle.findUnique({ where: { id: cycle.id }, include: { photos: true } })
+      }
+      return saved
+    })
+    return res.json(serialize(updated))
   } catch (error) { console.error('Erro ao salvar avaliação:', error); return res.status(500).json({ error: 'Erro ao salvar avaliação' }) }
 }
 export async function uploadPhoto(req, res) {
@@ -86,7 +96,7 @@ export async function uploadPhoto(req, res) {
     const photo = await prisma.assessmentPhoto.upsert({ where: { cycleId_view: { cycleId: cycle.id, view } }, update: { storageKey: req.file.filename, originalName: req.file.originalname, mimeType: req.file.mimetype, size: req.file.size }, create: { cycleId: cycle.id, view, storageKey: req.file.filename, originalName: req.file.originalname, mimeType: req.file.mimetype, size: req.file.size } })
     if (existing && existing.storageKey !== req.file.filename) fs.promises.unlink(path.join(req.file.destination, existing.storageKey)).catch(() => {})
     const count = await prisma.assessmentPhoto.count({ where: { cycleId: cycle.id } })
-    await prisma.assessmentCycle.update({ where: { id: cycle.id }, data: { stageStatuses: { ...blankStatuses(), ...(cycle.stageStatuses || {}), POSTURAL: count === 4 ? 'COMPLETED' : 'IN_PROGRESS' } } })
+    await prisma.assessmentCycle.update({ where: { id: cycle.id }, data: { stageStatuses: { ...blankStatuses(), ...(cycle.stageStatuses || {}), POSTURAL: count === 12 ? 'COMPLETED' : 'IN_PROGRESS' } } })
     return res.status(201).json({ id: photo.id, view: photo.view, url: `/assessments/photos/${photo.id}` })
   } catch (error) { if (req.file) fs.promises.unlink(req.file.path).catch(() => {}); console.error('Erro ao enviar foto:', error); return res.status(500).json({ error: 'Erro ao enviar foto' }) }
 }
