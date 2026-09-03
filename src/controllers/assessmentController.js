@@ -29,9 +29,9 @@ function serialize(cycle) {
 }
 const textValue = (input, key, max = 1500) => typeof input[key] === 'string' ? input[key].trim().slice(0, max) : ''
 function sanitizeAnamnesis(input = {}) {
-  const textFields = ['motivationAndInstagram', 'personalTrainerExperience', 'routine', 'trainingDifficulties', 'sleepQuality', 'nutrition', 'smokingAndAlcohol', 'healthAndMedication', 'currentSymptoms', 'injuryHistory', 'surgeryHistory', 'allergies', 'currentPain', 'effortDiscomfort', 'goals', 'bodyPerception', 'currentExercises', 'cardio', 'trainingLocation', 'muscleEmphasis', 'effortPreference', 'exercisePreferences', 'methodPreferences', 'relevantNotes']
+  const textFields = ['motivationAndInstagram', 'personalTrainerExperience', 'routine', 'trainingDifficulties', 'sleepQuality', 'nutrition', 'smokingAndAlcohol', 'healthAndMedication', 'currentSymptoms', 'injuryHistory', 'surgeryHistory', 'allergies', 'currentPain', 'effortDiscomfort', 'goals', 'bodyPerception', 'currentExercises', 'cardio', 'trainingLocation', 'muscleEmphasis', 'effortPreference', 'exercisePreferences', 'methodPreferences', 'relevantNotes', 'routineChanges', 'wellbeingChanges', 'workoutFeedback', 'currentBodyPerception']
   const result = Object.fromEntries(textFields.map((key) => [key, textValue(input, key, 3500)]))
-  return { ...result, fatigueLevel: finite(input.fatigueLevel, 0, 10), sleepHours: finite(input.sleepHours, 0, 24), waterLiters: finite(input.waterLiters, 0, 20), weeklyFrequency: finite(input.weeklyFrequency, 0, 14), trainingMinutes: finite(input.trainingMinutes, 0, 600) }
+  return { ...result, fatigueLevel: finite(input.fatigueLevel, 0, 10), sleepHours: finite(input.sleepHours, 0, 24), waterLiters: finite(input.waterLiters, 0, 20), weeklyFrequency: finite(input.weeklyFrequency, 0, 14), trainingMinutes: finite(input.trainingMinutes, 0, 600), trainingDedicationScore: finite(input.trainingDedicationScore, 0, 10), nutritionHydrationScore: finite(input.nutritionHydrationScore, 0, 10) }
 }
 function sanitizeBody(input = {}) { return Object.fromEntries(['weightKg', 'heightCm', 'waistCm', 'hipCm', 'rightArmCm', 'leftArmCm', 'rightThighCm', 'leftThighCm'].map((key) => [key, finite(input[key], 0, 500)])) }
 function sanitizeStrength(input = {}) {
