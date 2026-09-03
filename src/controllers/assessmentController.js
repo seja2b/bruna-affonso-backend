@@ -29,8 +29,9 @@ function serialize(cycle) {
 }
 const textValue = (input, key, max = 1500) => typeof input[key] === 'string' ? input[key].trim().slice(0, max) : ''
 function sanitizeAnamnesis(input = {}) {
-  const yesNo = (key) => ['YES', 'NO'].includes(input[key]) ? input[key] : ''
-  return { healthHistory: textValue(input, 'healthHistory'), injuries: yesNo('injuries'), injuryDetails: textValue(input, 'injuryDetails'), pain: yesNo('pain'), painDetails: textValue(input, 'painDetails'), surgeries: yesNo('surgeries'), surgeryDetails: textValue(input, 'surgeryDetails'), medications: yesNo('medications'), medicationDetails: textValue(input, 'medicationDetails'), restrictions: yesNo('restrictions'), restrictionDetails: textValue(input, 'restrictionDetails'), routine: textValue(input, 'routine'), sleepHours: finite(input.sleepHours, 0, 24), sleepQuality: textValue(input, 'sleepQuality', 100), activityLevel: textValue(input, 'activityLevel', 100), trainingExperience: textValue(input, 'trainingExperience'), weeklyFrequency: finite(input.weeklyFrequency, 0, 14), goals: textValue(input, 'goals'), relevantNotes: textValue(input, 'relevantNotes') }
+  const textFields = ['motivationAndInstagram', 'personalTrainerExperience', 'routine', 'trainingDifficulties', 'sleepQuality', 'nutrition', 'smokingAndAlcohol', 'healthAndMedication', 'currentSymptoms', 'injuryHistory', 'surgeryHistory', 'allergies', 'currentPain', 'effortDiscomfort', 'goals', 'bodyPerception', 'currentExercises', 'cardio', 'trainingLocation', 'muscleEmphasis', 'effortPreference', 'exercisePreferences', 'methodPreferences', 'relevantNotes']
+  const result = Object.fromEntries(textFields.map((key) => [key, textValue(input, key, 3500)]))
+  return { ...result, fatigueLevel: finite(input.fatigueLevel, 0, 10), sleepHours: finite(input.sleepHours, 0, 24), waterLiters: finite(input.waterLiters, 0, 20), weeklyFrequency: finite(input.weeklyFrequency, 0, 14), trainingMinutes: finite(input.trainingMinutes, 0, 600) }
 }
 function sanitizeBody(input = {}) { return Object.fromEntries(['weightKg', 'heightCm', 'waistCm', 'hipCm', 'rightArmCm', 'leftArmCm', 'rightThighCm', 'leftThighCm'].map((key) => [key, finite(input[key], 0, 500)])) }
 function sanitizeStrength(input = {}) {
