@@ -105,6 +105,8 @@ export const login = async (req, res) => {
         name: user.name,
         role: user.role,
         status: user.status,
+        phone: user.phone,
+        profilePhoto: user.profilePhoto,
         studentId: loginStudent?.id || null,
         assessmentIntroSeenAt: loginStudent?.assessmentIntroSeenAt || null
       }
