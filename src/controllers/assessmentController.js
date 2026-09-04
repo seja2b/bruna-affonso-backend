@@ -41,7 +41,10 @@ function sanitizeStrength(input = {}) {
 }
 function sanitizeEndurance(input = {}) {
   const distanceMeters = finite(input.distanceMeters, 0, 100000)
-  return { modality: 'TREADMILL', distanceMeters, vamKmh: distanceMeters === null ? null : Number((distanceMeters / 83.33).toFixed(2)) }
+  const modality = input.modality === 'WALKING_6MIN' ? 'WALKING_6MIN' : 'TREADMILL_5MIN'
+  const vamKmh = modality === 'TREADMILL_5MIN' && distanceMeters !== null ? Number((distanceMeters / 83.33).toFixed(2)) : null
+  const vo2Max = distanceMeters === null ? null : modality === 'WALKING_6MIN' ? Number((4.948 + 0.023 * distanceMeters).toFixed(2)) : Number((vamKmh * 3.5).toFixed(2))
+  return { modality, distanceMeters, vamKmh, vo2Max }
 }
 export async function getMyAssessments(req, res) {
   try {
