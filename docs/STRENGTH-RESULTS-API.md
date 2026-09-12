@@ -49,6 +49,7 @@ Motivos de classificação:
 - `MISSING_OR_INVALID_BODY_WEIGHT`: há 1RM, mas falta peso válido no próprio ciclo.
 - `BELOW_DEFINED_RANGE`: Smith abaixo de 0,75x ou terra abaixo de 1,00x.
 - `UNDEFINED_RANGE`: Smith estritamente acima de 1,20x e abaixo de 1,25x.
+- `NON_FINITE_RESULT`: entradas numéricas extremas impedem uma divisão finita.
 
 Smith: Fraco `[0,75; 1,00)`, Bom `[1,00; 1,20]`, Excelente `[1,25; +∞)`.
 Terra: Fraco `[1,00; 1,25)`, Bom `[1,25; 1,50)`, Excelente `[1,50; +∞)`.

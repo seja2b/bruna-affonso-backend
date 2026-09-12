@@ -47,11 +47,14 @@ export function strengthResults(cycle) {
     const repetitions = notPerformed ? null : numericValue(input?.repetitions, repetitionOptions)
     const estimatedOneRm = notPerformed ? null : estimateOneRm(loadKg, repetitions)
     const applicable = ['smithSquat', 'deadlift'].includes(exercise)
-    const relativeStrength = applicable && estimatedOneRm !== null && bodyWeightKg !== null ? estimatedOneRm / bodyWeightKg : null
+    const relative = applicable && estimatedOneRm !== null && bodyWeightKg !== null ? estimatedOneRm / bodyWeightKg : null
+    const relativeStrength = Number.isFinite(relative) ? relative : null
     let classification = classifyStrength(exercise, relativeStrength)
     const resultReason = notPerformed ? 'NOT_PERFORMED' : estimatedOneRm === null ? 'MISSING_OR_INVALID_INPUT' : null
     if (applicable && (resultReason || bodyWeightKg === null)) {
       classification = { classification: null, classificationReason: resultReason || 'MISSING_OR_INVALID_BODY_WEIGHT' }
+    } else if (relative !== null && !Number.isFinite(relative)) {
+      classification = { classification: null, classificationReason: 'NON_FINITE_RESULT' }
     }
     return [exercise, {
       loadKg, repetitions, estimatedOneRm, bodyWeightKg, relativeStrength,

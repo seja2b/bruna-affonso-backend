@@ -99,3 +99,12 @@ test('explicitly not performed has no estimate even with conflicting historical 
   assert.equal(result.classificationReason, 'NOT_PERFORMED')
   assert.equal(result.notPerformedReason, 'Dor')
 })
+
+test('non-finite relative strength is unavailable and declining 1RM keeps its negative delta', () => {
+  const extreme = strengthResults(cycle('a', 0, Number.MIN_VALUE)).exercises.smithSquat
+  assert.equal(extreme.relativeStrength, null)
+  assert.equal(extreme.classificationReason, 'NON_FINITE_RESULT')
+  const comparison = strengthComparison(cycle('b', 1, 60, 15), cycle('a', 0, 60, 30)).exercises.deadlift
+  assert.equal(comparison.differenceKg, -30)
+  assert.equal(comparison.evolutionPercent, -50)
+})
