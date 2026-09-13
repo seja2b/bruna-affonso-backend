@@ -6,7 +6,9 @@
   "main": "src/server.js",
   "scripts": {
     "start": "prisma db execute --file prisma/sql/ensure_refresh_sessions.sql --schema prisma/schema.prisma && prisma db execute --file prisma/sql/ensure_assessments.sql --schema prisma/schema.prisma && prisma db execute --file prisma/sql/ensure_program_features.sql --schema prisma/schema.prisma && node src/server.js",
-    "dev": "node --watch src/server.js"
+    "dev": "node --watch src/server.js",
+    "test": "node --test tests/*.test.js",
+    "test:integration": "node --test tests/integration/*.test.js"
   },
   "keywords": [],
   "author": "",
