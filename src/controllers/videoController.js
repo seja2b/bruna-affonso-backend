@@ -1,7 +1,9 @@
 import { PrismaClient } from '@prisma/client'
+import { createReorderVideos, videoOrderBy } from '../services/videoOrderService.js'
 import { createNotifications } from '../services/notificationService.js'
 
 const prisma = new PrismaClient()
+export const reorderVideos = createReorderVideos(prisma)
 
 function normalizeVideoPayload(body) {
   return {
@@ -29,7 +31,7 @@ function validateVideoPayload(payload) {
 
 export async function getVideos(req, res) {
   try {
-    const videos = await prisma.video.findMany({ orderBy: [{ createdAt: 'desc' }, { title: 'asc' }] })
+    const videos = await prisma.video.findMany({ orderBy: videoOrderBy })
     return res.json(videos)
   } catch (error) {
     console.error('Erro ao buscar vídeos:', error)
@@ -44,8 +46,10 @@ export async function createVideo(req, res) {
     if (validationError) return res.status(400).json({ error: validationError })
 
     const video = await prisma.$transaction(async (tx) => {
+      const last = await tx.video.aggregate({ _max: { sortOrder: true } })
       const created = await tx.video.create({
         data: {
+          sortOrder: (last._max.sortOrder ?? 0) + 1,
           title: payload.title,
           description: payload.description || null,
           category: payload.category || null,
