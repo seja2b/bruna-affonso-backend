@@ -134,6 +134,8 @@ model Notification {
   title     String
   message   String    @db.Text
   type      String
+  key       String?   @unique
+  actionUrl String?
   isRead    Boolean   @default(false)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
