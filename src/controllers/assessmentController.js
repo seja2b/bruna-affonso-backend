@@ -1,9 +1,13 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import crypto from 'node:crypto'
 import { PrismaClient } from '@prisma/client'
 import { strengthResults, strengthComparison, previousCycle } from '../services/strengthResultsService.js'
 import { AssessmentError } from '../services/assessmentValidationService.js'
 import { STAGES, blankStatuses, stageUpdate, persistCycleUpdate, lockCycle } from '../services/assessmentCycleService.js'
+import { objectStorageConfigured, readObject, removeObject, storeObject } from '../services/objectStorageService.js'
+
+const assessmentUploadDir = path.resolve(process.env.ASSESSMENT_UPLOAD_DIR || 'private_uploads/assessments')
 
 export function createAssessmentHandlers(prisma) {
   const PHOTO_VIEWS = ['FRONT', 'BACK', 'RIGHT', 'LEFT', 'FRONT_RELAXED', 'BACK_RELAXED', 'RIGHT_RELAXED', 'LEFT_RELAXED', 'FRONT_DETAIL', 'BACK_DETAIL', 'RIGHT_DETAIL', 'LEFT_DETAIL', 'FRONT_FOURTH', 'BACK_FOURTH', 'RIGHT_FOURTH', 'LEFT_FOURTH', 'FRONT_FIFTH', 'BACK_FIFTH', 'RIGHT_FIFTH', 'LEFT_FIFTH', 'POSTERIOR_RIGHT', 'POSTERIOR_LEFT', 'DEEP_SQUAT']
@@ -59,16 +63,28 @@ export function createAssessmentHandlers(prisma) {
   }
   async function uploadPhoto(req, res) {
     let committed = false
+    let uploadedStorageKey = null
     try {
       const view = String(req.params.view || '').toUpperCase()
       if (!PHOTO_VIEWS.includes(view)) throw new AssessmentError('Ângulo de foto inválido')
       const cycle = await ownedCycle(req, req.params.cycleId, { photos: true })
       if (!cycle || req.user.role !== 'STUDENT') throw new AssessmentError('Avaliação não encontrada', 404)
       if (!req.file) throw new AssessmentError('Selecione uma imagem JPG, PNG ou WebP')
+      uploadedStorageKey = req.file.filename
+      if (objectStorageConfigured()) {
+        const extension = path.extname(req.file.originalname).toLowerCase() || '.jpg'
+        uploadedStorageKey = `assessments/${cycle.id}/${view.toLowerCase()}/${crypto.randomUUID()}${extension}`
+        await storeObject({
+          key: uploadedStorageKey,
+          buffer: req.file.buffer,
+          contentType: req.file.mimetype,
+          metadata: { cycle: cycle.id, view: view.toLowerCase() }
+        })
+      }
       const { photo, existing } = await prisma.$transaction(async (tx) => {
         const current = await lockCycle(tx, cycle.id)
         const existing = current.photos.find((item) => item.view === view)
-        const file = { storageKey: req.file.filename, originalName: req.file.originalname, mimeType: req.file.mimetype, size: req.file.size }
+        const file = { storageKey: uploadedStorageKey, originalName: req.file.originalname, mimeType: req.file.mimetype, size: req.file.size }
         const photo = await tx.assessmentPhoto.upsert({ where: { cycleId_view: { cycleId: cycle.id, view } }, update: file, create: { cycleId: cycle.id, view, ...file } })
         const views = new Set([...current.photos.map((item) => item.view), view])
         const complete = PHOTO_VIEWS.every((item) => views.has(item))
@@ -76,18 +92,18 @@ export function createAssessmentHandlers(prisma) {
         return { photo, existing }
       })
       committed = true
-      if (existing && existing.storageKey !== req.file.filename) fs.promises.unlink(path.join(req.file.destination, existing.storageKey)).catch(() => {})
+      if (existing && existing.storageKey !== uploadedStorageKey) await removeObject(existing.storageKey, assessmentUploadDir)
       return res.status(201).json({ id: photo.id, view: photo.view, url: `/assessments/photos/${photo.id}` })
-    } catch (error) { if (req.file && !committed) await fs.promises.unlink(req.file.path).catch(() => {}); if (error instanceof AssessmentError) return res.status(error.status).json({ error: error.message }); console.error('Erro ao enviar foto:', error); return res.status(500).json({ error: 'Erro ao enviar foto' }) }
+    } catch (error) { if (req.file && !committed) { if (uploadedStorageKey) await removeObject(uploadedStorageKey, assessmentUploadDir); if (req.file.path) await fs.promises.unlink(req.file.path).catch(() => {}) } if (error instanceof AssessmentError) return res.status(error.status).json({ error: error.message }); console.error('Erro ao enviar foto:', error); return res.status(500).json({ error: 'Erro ao enviar foto' }) }
   }
   async function getPrivatePhoto(req, res) {
     const photo = await prisma.assessmentPhoto.findUnique({ where: { id: req.params.photoId }, include: { cycle: true } })
     if (!photo) return res.status(404).json({ error: 'Foto não encontrada' })
     if (req.user.role === 'STUDENT') { const student = await studentForUser(req.user.userId); if (!student || photo.cycle.studentId !== student.id) return res.status(403).json({ error: 'Acesso não autorizado' }) }
-    const filePath = path.resolve(process.env.ASSESSMENT_UPLOAD_DIR || 'private_uploads/assessments', photo.storageKey)
-    if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Arquivo não encontrado' })
+    const object = await readObject(photo.storageKey, assessmentUploadDir)
+    if (!object) return res.status(404).json({ error: 'Arquivo não encontrado' })
     res.set({ 'Content-Type': photo.mimeType, 'Cache-Control': 'private, no-store', 'Content-Disposition': `inline; filename="${encodeURIComponent(photo.originalName)}"` })
-    return res.sendFile(filePath)
+    return object.buffer ? res.send(object.buffer) : res.sendFile(object.filePath)
   }
   async function getAdminAssessments(req, res) {
     const student = await prisma.student.findUnique({ where: { id: req.params.studentId }, include: { user: { select: { id: true, name: true, email: true } } } })
