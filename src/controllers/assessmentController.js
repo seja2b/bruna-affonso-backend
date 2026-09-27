@@ -10,7 +10,7 @@ import { objectStorageConfigured, readObject, removeObject, storeObject } from '
 const assessmentUploadDir = path.resolve(process.env.ASSESSMENT_UPLOAD_DIR || 'private_uploads/assessments')
 
 export function createAssessmentHandlers(prisma) {
-  const PHOTO_VIEWS = ['FRONT', 'BACK', 'RIGHT', 'LEFT', 'FRONT_RELAXED', 'BACK_RELAXED', 'RIGHT_RELAXED', 'LEFT_RELAXED', 'FRONT_DETAIL', 'BACK_DETAIL', 'RIGHT_DETAIL', 'LEFT_DETAIL', 'FRONT_FOURTH', 'BACK_FOURTH', 'RIGHT_FOURTH', 'LEFT_FOURTH', 'FRONT_FIFTH', 'BACK_FIFTH', 'RIGHT_FIFTH', 'LEFT_FIFTH', 'POSTERIOR_RIGHT', 'POSTERIOR_LEFT', 'DEEP_SQUAT']
+  const PHOTO_VIEWS = ['FRONT', 'BACK', 'RIGHT', 'LEFT', 'FRONT_RELAXED', 'BACK_RELAXED', 'RIGHT_RELAXED', 'LEFT_RELAXED', 'FRONT_DETAIL', 'BACK_DETAIL', 'RIGHT_DETAIL', 'LEFT_DETAIL', 'FRONT_FOURTH', 'BACK_FOURTH', 'RIGHT_FOURTH', 'LEFT_FOURTH', 'FRONT_FIFTH', 'BACK_FIFTH', 'RIGHT_FIFTH', 'LEFT_FIFTH', 'POSTERIOR_RIGHT', 'POSTERIOR_LEFT', 'DEEP_SQUAT', 'PECTORAL']
   const deadline = () => new Date(Date.now() + 7 * 86400000)
   async function studentForUser(userId) { return prisma.student.findUnique({ where: { userId }, select: { id: true } }) }
   async function ownedCycle(req, cycleId, include = {}) {
