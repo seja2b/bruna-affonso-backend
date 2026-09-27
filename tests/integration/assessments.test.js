@@ -18,7 +18,7 @@ const handlers = createAssessmentHandlers(prisma)
 let server, baseUrl, student, otherStudent, uploadDir
 const fullStrength = (loadKg = 30) => Object.fromEntries(STRENGTH_EXERCISES.map((key) => [key, { loadKg, repetitions: 30, estimatedOneRm: 99999 }]))
 const completedStages = () => Object.fromEntries(STAGES.map((stage) => [stage, 'COMPLETED']))
-const photoViews = ['FRONT', 'BACK', 'RIGHT', 'LEFT', 'FRONT_RELAXED', 'BACK_RELAXED', 'RIGHT_RELAXED', 'LEFT_RELAXED', 'FRONT_DETAIL', 'BACK_DETAIL', 'RIGHT_DETAIL', 'LEFT_DETAIL', 'FRONT_FOURTH', 'BACK_FOURTH', 'RIGHT_FOURTH', 'LEFT_FOURTH', 'FRONT_FIFTH', 'BACK_FIFTH', 'RIGHT_FIFTH', 'LEFT_FIFTH', 'POSTERIOR_RIGHT', 'POSTERIOR_LEFT', 'DEEP_SQUAT']
+const photoViews = ['FRONT', 'BACK', 'RIGHT', 'LEFT', 'FRONT_RELAXED', 'BACK_RELAXED', 'RIGHT_RELAXED', 'LEFT_RELAXED', 'FRONT_DETAIL', 'BACK_DETAIL', 'RIGHT_DETAIL', 'LEFT_DETAIL', 'FRONT_FOURTH', 'BACK_FOURTH', 'RIGHT_FOURTH', 'LEFT_FOURTH', 'FRONT_FIFTH', 'BACK_FIFTH', 'RIGHT_FIFTH', 'LEFT_FIFTH', 'POSTERIOR_RIGHT', 'POSTERIOR_LEFT', 'DEEP_SQUAT', 'PECTORAL']
 
 before(async () => {
   await prisma.$connect()
@@ -61,10 +61,10 @@ async function request(url, method = 'GET', body) {
 function createCycle(data = {}) {
   return prisma.assessmentCycle.create({ data: { studentId: student.id, deadlineAt: new Date(Date.now() + 86400000), stageStatuses: blankStatuses(), ...data } })
 }
-async function seedPhotos(cycleId, count = 23) {
+async function seedPhotos(cycleId, count = 24) {
   await prisma.assessmentPhoto.createMany({ data: photoViews.slice(0, count).map((view) => ({ cycleId, view, storageKey: randomUUID(), originalName: 'fixture.jpg', mimeType: 'image/jpeg', size: 1 })) })
 }
-async function upload(cycle, view = 'DEEP_SQUAT') {
+async function upload(cycle, view = 'PECTORAL') {
   const filename = `${randomUUID()}.jpg`
   await writeFile(path.join(uploadDir, filename), 'x')
   return { filename, ...await request(`/assessments/${cycle.id}/photos/${view}`, 'POST', { filename }) }
@@ -155,7 +155,7 @@ test('last regular stage finalizes an initial cycle without awarding reassessmen
 test('last photo finalizes reassessment, awards once and permits the next cycle', async () => {
   await createCycle({ status: 'COMPLETED' })
   const cycle = await createCycle({ type: 'REASSESSMENT', sequence: 1, stageStatuses: { ...completedStages(), POSTURAL: 'IN_PROGRESS' }, strengthTest: fullStrength(), bodyAssessment: { weightKg: 60 }, healthConsentAt: new Date() })
-  await seedPhotos(cycle.id, 22)
+  await seedPhotos(cycle.id, 23)
   assert.equal((await upload(cycle)).status, 201)
   const updated = await prisma.assessmentCycle.findUnique({ where: { id: cycle.id } })
   assert.equal(updated.status, 'COMPLETED')
@@ -174,7 +174,7 @@ test('last photo finalizes reassessment, awards once and permits the next cycle'
 
 test('concurrent last stage and last photo finalize with one points award', async () => {
   const cycle = await createCycle({ type: 'REASSESSMENT', sequence: 1, stageStatuses: { ...completedStages(), POSTURAL: 'IN_PROGRESS', STRENGTH: 'IN_PROGRESS' }, strengthTest: fullStrength(), bodyAssessment: { weightKg: 60 }, healthConsentAt: new Date() })
-  await seedPhotos(cycle.id, 22)
+  await seedPhotos(cycle.id, 23)
   const [photo, stage] = await Promise.all([upload(cycle), request(`/assessments/${cycle.id}/stages/STRENGTH`, 'PATCH', { data: {}, complete: true })])
   assert.equal(photo.status, 201)
   assert.equal(stage.status, 200)
@@ -184,10 +184,10 @@ test('concurrent last stage and last photo finalize with one points award', asyn
 
 test('last photo rolls back if legacy completed stages lack required source data', async () => {
   const cycle = await createCycle({ stageStatuses: { ...completedStages(), POSTURAL: 'IN_PROGRESS' }, strengthTest: fullStrength(), healthConsentAt: new Date() })
-  await seedPhotos(cycle.id, 22)
+  await seedPhotos(cycle.id, 23)
   const response = await upload(cycle)
   assert.equal(response.status, 400)
-  assert.equal(await prisma.assessmentPhoto.count({ where: { cycleId: cycle.id } }), 22)
+  assert.equal(await prisma.assessmentPhoto.count({ where: { cycleId: cycle.id } }), 23)
   assert.deepEqual(await prisma.assessmentCycle.findUnique({ where: { id: cycle.id } }), cycle)
   await assert.rejects(access(path.join(uploadDir, response.filename)))
 })
