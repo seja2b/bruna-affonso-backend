@@ -78,11 +78,11 @@ function normalizeExercises(exercises) {
       reps: String(exercise.reps || '').trim(),
       notes: String(exercise.notes || '').trim()
     }))
-    .filter((exercise) => [exercise.exerciseName, exercise.trainingType, exercise.weight, exercise.reps, exercise.notes].some(Boolean))
+    .filter((exercise) => [exercise.exerciseName, exercise.weight, exercise.reps, exercise.notes].some(Boolean))
 }
 
 function isExerciseComplete(exercise) {
-  return Boolean(exercise.exerciseName && exercise.trainingType && exercise.weight && exercise.reps)
+  return Boolean(exercise.exerciseName && exercise.weight && exercise.reps)
 }
 
 export async function getStudentWeeks(req, res) {
@@ -170,7 +170,7 @@ export async function completeWeek(req, res) {
 
     const incomplete = week.exercises.some((exercise) => !isExerciseComplete(exercise))
     if (incomplete) {
-      return res.status(400).json({ error: 'Preencha exercício, tipo de treino, carga e repetições em todos os registros' })
+      return res.status(400).json({ error: 'Preencha exercício, carga e repetições em todos os registros' })
     }
 
     const result = await prisma.$transaction(async (tx) => {
