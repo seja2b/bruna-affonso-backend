@@ -6,11 +6,15 @@ import multer from 'multer'
 import authMiddleware from '../middleware/authMiddleware.js'
 import { requireRole } from '../middleware/roleMiddleware.js'
 import { createEbook, deleteEbook, downloadEbook, listEbooks } from '../controllers/ebookController.js'
+import { objectStorageConfigured } from '../services/objectStorageService.js'
 
 const router = express.Router()
 const uploadDir = path.resolve(process.env.EBOOK_UPLOAD_DIR || 'private_uploads/ebooks')
 fs.mkdirSync(uploadDir, { recursive: true })
-const upload = multer({ storage: multer.diskStorage({ destination: uploadDir, filename: (_req, _file, done) => done(null, `${crypto.randomUUID()}.pdf`) }), limits: { fileSize: Number(process.env.EBOOK_MAX_BYTES || 20 * 1024 * 1024), files: 1 }, fileFilter: (_req, file, done) => done(null, file.mimetype === 'application/pdf') })
+const storage = objectStorageConfigured()
+  ? multer.memoryStorage()
+  : multer.diskStorage({ destination: uploadDir, filename: (_req, _file, done) => done(null, `${crypto.randomUUID()}.pdf`) })
+const upload = multer({ storage, limits: { fileSize: Number(process.env.EBOOK_MAX_BYTES || 20 * 1024 * 1024), files: 1 }, fileFilter: (_req, file, done) => done(null, file.mimetype === 'application/pdf') })
 
 router.use(authMiddleware)
 router.get('/', requireRole('STUDENT', 'ADMIN'), listEbooks)
