@@ -37,4 +37,7 @@ CREATE TABLE IF NOT EXISTS "Ebook" (
   "updatedAt" TIMESTAMP(3) NOT NULL,
   CONSTRAINT "Ebook_pkey" PRIMARY KEY ("id")
 );
+
+ALTER TABLE "Ebook" ADD COLUMN IF NOT EXISTS "coverStorageKey" TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS "Ebook_coverStorageKey_key" ON "Ebook"("coverStorageKey");
 CREATE UNIQUE INDEX IF NOT EXISTS "Ebook_storageKey_key" ON "Ebook"("storageKey");
