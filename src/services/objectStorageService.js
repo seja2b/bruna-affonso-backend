@@ -37,12 +37,12 @@ export async function storeObject({ key, buffer, contentType, metadata = {} }) {
   return key
 }
 
-export async function readObject(storageKey, legacyDirectory) {
+export async function readObject(storageKey, legacyDirectory, range) {
   const storage = r2Client()
   if (storage) {
     try {
-      const object = await storage.send(new GetObjectCommand({ Bucket: process.env.R2_BUCKET, Key: storageKey }))
-      return { buffer: Buffer.from(await object.Body.transformToByteArray()), contentType: object.ContentType }
+      const object = await storage.send(new GetObjectCommand({ Bucket: process.env.R2_BUCKET, Key: storageKey, Range: range }))
+      return { buffer: Buffer.from(await object.Body.transformToByteArray()), contentType: object.ContentType, contentLength: object.ContentLength, contentRange: object.ContentRange }
     } catch (error) {
       if (!['NoSuchKey', 'NotFound'].includes(error?.name) && error?.$metadata?.httpStatusCode !== 404) throw error
     }
