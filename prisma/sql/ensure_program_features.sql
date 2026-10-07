@@ -41,3 +41,14 @@ CREATE TABLE IF NOT EXISTS "Ebook" (
 ALTER TABLE "Ebook" ADD COLUMN IF NOT EXISTS "coverStorageKey" TEXT;
 CREATE UNIQUE INDEX IF NOT EXISTS "Ebook_coverStorageKey_key" ON "Ebook"("coverStorageKey");
 CREATE UNIQUE INDEX IF NOT EXISTS "Ebook_storageKey_key" ON "Ebook"("storageKey");
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'Ebook' AND column_name = 'sortOrder') THEN
+    ALTER TABLE "Ebook" ADD COLUMN "sortOrder" INTEGER NOT NULL DEFAULT 0;
+    WITH ordered AS (
+      SELECT "id", ROW_NUMBER() OVER (ORDER BY "createdAt" DESC, "title" ASC, "id" ASC) AS position FROM "Ebook"
+    )
+    UPDATE "Ebook" SET "sortOrder" = ordered.position FROM ordered WHERE "Ebook"."id" = ordered."id";
+  END IF;
+END $$;

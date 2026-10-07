@@ -5,7 +5,7 @@ import express from 'express'
 import multer from 'multer'
 import authMiddleware from '../middleware/authMiddleware.js'
 import { requireRole } from '../middleware/roleMiddleware.js'
-import { createEbook, deleteEbook, downloadEbook, getEbookCover, listEbooks, updateEbookCover } from '../controllers/ebookController.js'
+import { createEbook, deleteEbook, downloadEbook, getEbookCover, listEbooks, reorderEbooks, updateEbookCover } from '../controllers/ebookController.js'
 import { objectStorageConfigured } from '../services/objectStorageService.js'
 
 const router = express.Router()
@@ -37,6 +37,7 @@ router.get('/', requireRole('STUDENT', 'ADMIN'), listEbooks)
 router.get('/:id/file', requireRole('STUDENT', 'ADMIN'), downloadEbook)
 router.get('/:id/cover', requireRole('STUDENT', 'ADMIN'), getEbookCover)
 router.post('/', requireRole('ADMIN'), handleUpload(upload.fields([{ name: 'file', maxCount: 1 }, { name: 'cover', maxCount: 1 }])), createEbook)
+router.put('/order', requireRole('ADMIN'), reorderEbooks)
 router.post('/:id/cover', requireRole('ADMIN'), handleUpload(upload.single('cover')), updateEbookCover)
 router.delete('/:id', requireRole('ADMIN'), deleteEbook)
 
