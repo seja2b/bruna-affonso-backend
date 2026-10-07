@@ -48,9 +48,24 @@ export async function createEbook(req, res) {
 export async function downloadEbook(req, res) {
   const ebook = await prisma.ebook.findUnique({ where: { id: req.params.id } })
   if (!ebook) return res.status(404).json({ error: 'E-book não encontrado' })
-  const object = await readObject(ebook.storageKey, uploadDir)
+  const requestedRange = req.headers.range
+  let range = null
+  if (requestedRange) {
+    const match = /^bytes=(\d+)-(\d*)$/.exec(requestedRange)
+    if (!match) return res.status(416).set('Content-Range', `bytes */${ebook.size}`).end()
+    const start = Number(match[1])
+    const end = match[2] ? Math.min(Number(match[2]), ebook.size - 1) : ebook.size - 1
+    if (start >= ebook.size || end < start) return res.status(416).set('Content-Range', `bytes */${ebook.size}`).end()
+    range = { start, end, header: `bytes=${start}-${end}` }
+  }
+  const object = await readObject(ebook.storageKey, uploadDir, range?.header)
   if (!object) return res.status(404).json({ error: 'Arquivo não encontrado' })
-  res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="${encodeURIComponent(ebook.originalName)}"`, 'Cache-Control': 'private, no-store' })
+  res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="${encodeURIComponent(ebook.originalName)}"`, 'Cache-Control': 'private, no-store', 'Accept-Ranges': 'bytes' })
+  if (range && object.buffer) {
+    res.status(206).set({ 'Content-Range': object.contentRange || `bytes ${range.start}-${range.end}/${ebook.size}`, 'Content-Length': String(object.contentLength || object.buffer.length) })
+    return res.send(object.buffer)
+  }
+  res.set('Content-Length', String(ebook.size))
   return object.buffer ? res.send(object.buffer) : res.sendFile(object.filePath)
 }
 
@@ -59,7 +74,7 @@ export async function getEbookCover(req, res) {
   if (!ebook?.coverStorageKey) return res.status(404).json({ error: 'Capa não encontrada' })
   const object = await readObject(ebook.coverStorageKey, uploadDir)
   if (!object) return res.status(404).json({ error: 'Capa não encontrada' })
-  res.set({ 'Content-Type': 'image/webp', 'Cache-Control': 'private, max-age=3600' })
+  res.set({ 'Content-Type': object.contentType || 'image/webp', 'Cache-Control': 'private, max-age=3600' })
   return object.buffer ? res.send(object.buffer) : res.sendFile(object.filePath)
 }
 
