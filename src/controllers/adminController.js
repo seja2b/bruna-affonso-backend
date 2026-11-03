@@ -71,6 +71,7 @@ export async function getStudents(req, res) {
 
     return res.json(students.map(({ student, ...user }) => ({
       ...user,
+      registrationDate: user.createdAt instanceof Date ? user.createdAt.toISOString() : user.createdAt,
       studentId: student?.id || null
     })))
   } catch (error) {
