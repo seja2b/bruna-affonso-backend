@@ -11,6 +11,7 @@ import {
   rotateRefreshSession,
   setRefreshCookie
 } from '../services/refreshSessionService.js'
+import { normalizeRegistrationInput, validateRegistrationInput } from '../utils/registrationValidation.js'
 
 const prisma = new PrismaClient()
 
@@ -19,15 +20,9 @@ const legacyMigrationEnabled = () => process.env.LEGACY_REFRESH_MIGRATION_ENABLE
 
 export const register = async (req, res) => {
   try {
-    const { email, password, name } = req.body
-
-    if (!email || !password || !name) {
-      return res.status(400).json({ error: 'Email, senha e nome são obrigatórios' })
-    }
-
-    if (password.length < 8) {
-      return res.status(400).json({ error: 'A senha deve ter pelo menos 8 caracteres' })
-    }
+    const { email, password, name, phone } = normalizeRegistrationInput(req.body)
+    const validationError = validateRegistrationInput({ email, password, name, phone })
+    if (validationError) return res.status(400).json({ error: validationError })
 
     const normalizedEmail = normalizeEmail(email)
     const existingUser = await prisma.user.findUnique({ where: { email: normalizedEmail } })
@@ -43,6 +38,7 @@ export const register = async (req, res) => {
           email: normalizedEmail,
           password: hashedPassword,
           name: name.trim(),
+          phone,
           role: 'STUDENT',
           status: 'PENDING'
         }
@@ -58,6 +54,7 @@ export const register = async (req, res) => {
         id: user.id,
         email: user.email,
         name: user.name,
+        phone: user.phone,
         role: user.role,
         status: user.status
       }
