@@ -42,6 +42,11 @@ ALTER TABLE "Ebook" ADD COLUMN IF NOT EXISTS "coverStorageKey" TEXT;
 CREATE UNIQUE INDEX IF NOT EXISTS "Ebook_coverStorageKey_key" ON "Ebook"("coverStorageKey");
 CREATE UNIQUE INDEX IF NOT EXISTS "Ebook_storageKey_key" ON "Ebook"("storageKey");
 
+-- Corrige a grafia da frase editorial já salva sem alterar outras personalizações.
+UPDATE "AdminSettings"
+SET "motivationalPhrase" = REPLACE("motivationalPhrase", 'melhror', 'melhor')
+WHERE "motivationalPhrase" LIKE '%melhror%';
+
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'Ebook' AND column_name = 'sortOrder') THEN
